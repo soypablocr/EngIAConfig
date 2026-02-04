@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Config Generator</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --success: #16a34a;
+            --error: #dc2626;
+            --warning: #ca8a04;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-light: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        header h1 {
+            font-size: 2rem;
+            color: var(--primary);
+        }
+
+        header p {
+            color: var(--text-light);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .interface-section {
+            background: var(--bg);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .interface-section h3 {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            margin-bottom: 0.75rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+        }
+
+        #output {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.8rem;
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .alert {
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .alert-error {
+            background: #fef2f2;
+            color: var(--error);
+            border: 1px solid #fecaca;
+        }
+
+        .alert-warning {
+            background: #fefce8;
+            color: var(--warning);
+            border: 1px solid #fef08a;
+        }
+
+        .alert-success {
+            background: #f0fdf4;
+            color: var(--success);
+            border: 1px solid #bbf7d0;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .checkbox-group input {
+            width: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🔧 Network Config Generator</h1>
+            <p>Generador de configuraciones multi-vendor</p>
+        </header>
+
+        <div id="alerts"></div>
+
+        <div class="grid">
+            <div>
+                <!-- Site Info -->
+                <div class="card">
+                    <h2>📍 Información del Sitio</h2>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Nombre del Sitio *</label>
+                            <input type="text" id="site_name" placeholder="SITE-001" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Cliente</label>
+                            <input type="text" id="customer" placeholder="Acme Corp">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Ubicación</label>
+                            <input type="text" id="location" placeholder="San José, Costa Rica">
+                        </div>
+                        <div class="form-group">
+                            <label>Zona Horaria</label>
+                            <select id="timezone">
+                                <option value="America/Costa_Rica">Costa Rica (UTC-6)</option>
+                                <option value="America/New_York">Eastern (UTC-5)</option>
+                                <option value="America/Chicago">Central (UTC-6)</option>
+                                <option value="America/Denver">Mountain (UTC-7)</option>
+                                <option value="America/Los_Angeles">Pacific (UTC-8)</option>
+                                <option value="UTC">UTC</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Device -->
+                <div class="card" style="margin-top: 1rem;">
+                    <h2>📦 Dispositivo</h2>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Vendor *</label>
+                            <select id="vendor" onchange="loadModels()">
+                                <option value="fortinet">Fortinet</option>
+                                <option value="meraki">Meraki</option>
+                                <option value="velocloud">Velocloud (VMware SD-WAN)</option>
+                                <option value="bigleaf">Bigleaf</option>
+                                <option value="cato">CATO Networks</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Modelo *</label>
+                            <select id="model">
+                                <option>Seleccione vendor primero</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Política de Seguridad</label>
+                        <select id="policy_template">
+                            <option value="basic">Básica - Solo NAT y acceso saliente</option>
+                            <option value="standard" selected>Estándar - Web filter, App control</option>
+                            <option value="advanced">Avanzada - IPS, Antivirus, SSL</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- WAN -->
+                <div class="card" style="margin-top: 1rem;">
+                    <h2>🌐 Configuración WAN</h2>
+
+                    <div class="interface-section">
+                        <h3>WAN 1 (Primario)</h3>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>IP Address *</label>
+                                <input type="text" id="wan1_ip" placeholder="203.0.113.10">
+                            </div>
+                            <div class="form-group">
+                                <label>Subnet Mask *</label>
+                                <input type="text" id="wan1_mask" placeholder="255.255.255.252">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>Gateway *</label>
+                                <input type="text" id="wan1_gw" placeholder="203.0.113.9">
+                            </div>
+                            <div class="form-group">
+                                <label>Bandwidth (Mbps)</label>
+                                <input type="number" id="wan1_bw" value="100">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>ISP Name</label>
+                            <input type="text" id="wan1_isp" placeholder="ISP-Primary">
+                        </div>
+                    </div>
+
+                    <div class="interface-section">
+                        <h3>WAN 2 (Secundario - Opcional)</h3>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>IP Address</label>
+                                <input type="text" id="wan2_ip" placeholder="198.51.100.10">
+                            </div>
+                            <div class="form-group">
+                                <label>Subnet Mask</label>
+                                <input type="text" id="wan2_mask" placeholder="255.255.255.252">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>Gateway</label>
+                                <input type="text" id="wan2_gw" placeholder="198.51.100.9">
+                            </div>
+                            <div class="form-group">
+                                <label>Bandwidth (Mbps)</label>
+                                <input type="number" id="wan2_bw" value="50">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>ISP Name</label>
+                            <input type="text" id="wan2_isp" placeholder="ISP-Backup">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LAN -->
+                <div class="card" style="margin-top: 1rem;">
+                    <h2>🏠 Configuración LAN</h2>
+
+                    <div class="interface-section">
+                        <h3>LAN / VLAN</h3>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>IP Address *</label>
+                                <input type="text" id="lan_ip" placeholder="192.168.1.1">
+                            </div>
+                            <div class="form-group">
+                                <label>Subnet Mask *</label>
+                                <input type="text" id="lan_mask" placeholder="255.255.255.0">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>VLAN ID</label>
+                                <input type="number" id="lan_vlan" placeholder="10">
+                            </div>
+                            <div class="form-group">
+                                <label>VLAN Name</label>
+                                <input type="text" id="lan_vlan_name" placeholder="Data">
+                            </div>
+                        </div>
+                        <div class="checkbox-group form-group">
+                            <input type="checkbox" id="dhcp_enabled" checked>
+                            <label for="dhcp_enabled">Habilitar DHCP Server</label>
+                        </div>
+                        <div class="row" id="dhcp_range">
+                            <div class="form-group">
+                                <label>DHCP Range Start</label>
+                                <input type="text" id="dhcp_start" placeholder="192.168.1.100">
+                            </div>
+                            <div class="form-group">
+                                <label>DHCP Range End</label>
+                                <input type="text" id="dhcp_end" placeholder="192.168.1.200">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Services -->
+                <div class="card" style="margin-top: 1rem;">
+                    <h2>⚙️ Servicios</h2>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>DNS Primary</label>
+                            <input type="text" id="dns1" value="8.8.8.8">
+                        </div>
+                        <div class="form-group">
+                            <label>DNS Secondary</label>
+                            <input type="text" id="dns2" value="8.8.4.4">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>NTP Server</label>
+                        <input type="text" id="ntp" value="pool.ntp.org">
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="generateConfig()">🚀 Generar Configuración</button>
+                    <button class="btn btn-success" onclick="downloadConfig()">📥 Descargar</button>
+                </div>
+            </div>
+
+            <!-- Output -->
+            <div>
+                <div class="card" style="height: 100%;">
+                    <h2>📄 Configuración Generada</h2>
+                    <pre id="output">La configuración aparecerá aquí...</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Modelos por vendor
+        const vendorModels = {
+            fortinet: ["FortiGate 40F", "FortiGate 60F", "FortiGate 70F", "FortiGate 80F", "FortiGate 100F", "FortiGate 200F"],
+            meraki: ["MX64", "MX67", "MX68", "MX75", "MX84", "MX85", "MX95", "MX100"],
+            velocloud: ["Edge 510", "Edge 520", "Edge 610", "Edge 620", "Edge 710", "Edge 840"],
+            bigleaf: ["Bigleaf Edge 100", "Bigleaf Edge 200", "Bigleaf Edge 500"],
+            cato: ["Socket X1500", "Socket X1600", "Socket X1700"]
+        };
+
+        function loadModels() {
+            const vendor = document.getElementById('vendor').value;
+            const modelSelect = document.getElementById('model');
+            modelSelect.innerHTML = '';
+
+            vendorModels[vendor].forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                modelSelect.appendChild(option);
+            });
+        }
+
+        function getFormData() {
+            const data = {
+                site_info: {
+                    name: document.getElementById('site_name').value,
+                    customer: document.getElementById('customer').value,
+                    location: document.getElementById('location').value,
+                    timezone: document.getElementById('timezone').value
+                },
+                device: {
+                    vendor: document.getElementById('vendor').value,
+                    model: document.getElementById('model').value
+                },
+                wan_interfaces: [],
+                lan_interfaces: [],
+                services: {
+                    dns_servers: [
+                        document.getElementById('dns1').value,
+                        document.getElementById('dns2').value
+                    ].filter(Boolean),
+                    ntp_servers: [document.getElementById('ntp').value].filter(Boolean)
+                },
+                policy_template: document.getElementById('policy_template').value
+            };
+
+            // WAN 1
+            if (document.getElementById('wan1_ip').value) {
+                data.wan_interfaces.push({
+                    interface_name: 'wan1',
+                    ip_address: document.getElementById('wan1_ip').value,
+                    subnet_mask: document.getElementById('wan1_mask').value,
+                    gateway: document.getElementById('wan1_gw').value,
+                    bandwidth_mbps: parseInt(document.getElementById('wan1_bw').value) || 100,
+                    isp_name: document.getElementById('wan1_isp').value || 'WAN-Primary',
+                    priority: 'primary'
+                });
+            }
+
+            // WAN 2
+            if (document.getElementById('wan2_ip').value) {
+                data.wan_interfaces.push({
+                    interface_name: 'wan2',
+                    ip_address: document.getElementById('wan2_ip').value,
+                    subnet_mask: document.getElementById('wan2_mask').value,
+                    gateway: document.getElementById('wan2_gw').value,
+                    bandwidth_mbps: parseInt(document.getElementById('wan2_bw').value) || 50,
+                    isp_name: document.getElementById('wan2_isp').value || 'WAN-Backup',
+                    priority: 'secondary'
+                });
+            }
+
+            // LAN
+            if (document.getElementById('lan_ip').value) {
+                data.lan_interfaces.push({
+                    interface_name: 'lan',
+                    ip_address: document.getElementById('lan_ip').value,
+                    subnet_mask: document.getElementById('lan_mask').value,
+                    vlan_id: parseInt(document.getElementById('lan_vlan').value) || null,
+                    vlan_name: document.getElementById('lan_vlan_name').value || 'LAN',
+                    dhcp_enabled: document.getElementById('dhcp_enabled').checked,
+                    dhcp_range_start: document.getElementById('dhcp_start').value,
+                    dhcp_range_end: document.getElementById('dhcp_end').value
+                });
+            }
+
+            return data;
+        }
+
+        function showAlert(message, type = 'error') {
+            const alertsDiv = document.getElementById('alerts');
+            alertsDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => alertsDiv.innerHTML = '', 5000);
+        }
+
+        async function generateConfig() {
+            const data = getFormData();
+
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('output').textContent = result.config;
+                    if (result.warnings && result.warnings.length > 0) {
+                        showAlert('Advertencias: ' + result.warnings.join(', '), 'warning');
+                    } else {
+                        showAlert('Configuración generada exitosamente', 'success');
+                    }
+                } else {
+                    document.getElementById('output').textContent = 'Error: ' + result.errors.join('\n');
+                    showAlert('Errores: ' + result.errors.join(', '), 'error');
+                }
+            } catch (error) {
+                showAlert('Error de conexión: ' + error.message, 'error');
+            }
+        }
+
+        async function downloadConfig() {
+            const data = getFormData();
+
+            try {
+                const response = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${data.site_info.name}_${data.device.vendor}.conf`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    showAlert('Archivo descargado', 'success');
+                } else {
+                    const result = await response.json();
+                    showAlert('Error: ' + (result.errors || [result.error]).join(', '), 'error');
+                }
+            } catch (error) {
+                showAlert('Error de conexión: ' + error.message, 'error');
+            }
+        }
+
+        // Inicializar
+        loadModels();
+
+        // Toggle DHCP fields
+        document.getElementById('dhcp_enabled').addEventListener('change', function () {
+            document.getElementById('dhcp_range').style.display = this.checked ? 'grid' : 'none';
+        });
+    </script>
+</body>
+
+</html>
