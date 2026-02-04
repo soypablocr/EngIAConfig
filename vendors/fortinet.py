@@ -186,17 +186,20 @@ end
             
             # DHCP Server
             if lan.get('dhcp_enabled'):
+                dns_servers = self.params.get('services', {}).get('dns_servers', ['8.8.8.8', '8.8.4.4'])
+                dns1 = dns_servers[0] if dns_servers else '8.8.8.8'
+                
                 config += f'''
 config system dhcp server
     edit {dhcp_id}
         set interface "{iface}"
-        set default-gateway {lan['ip_address']}
-        set dns-server1 {self.params.get('services', {}).get('dns_servers', ['8.8.8.8'])[0]}
+        set default-gateway {lan.get('ip_address', '192.168.1.1')}
+        set dns-server1 {dns1}
         set lease-time 86400
         config ip-range
             edit 1
-                set start-ip {lan['dhcp_range_start']}
-                set end-ip {lan['dhcp_range_end']}
+                set start-ip {lan.get('dhcp_range_start', '')}
+                set end-ip {lan.get('dhcp_range_end', '')}
             next
         end
     next

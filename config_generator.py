@@ -79,7 +79,7 @@ class NetworkConfigGenerator:
                 'warnings': warnings,
                 'config': config_output,
                 'vendor': vendor_name,
-                'site_name': params['site_info']['name'],
+                'site_name': params.get('site_info', {}).get('name', 'Unknown'),
                 'output_format': vendor_config.OUTPUT_FORMAT
             }
             

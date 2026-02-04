@@ -554,7 +554,18 @@
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `${data.site_info.name}_${data.device.vendor}.conf`;
+
+                    // Obtener extensión sugerida
+                    const extensions = {
+                        fortinet: '.conf',
+                        meraki: '.json',
+                        velocloud: '.json',
+                        bigleaf: '.json',
+                        cato: '.json'
+                    };
+                    const ext = extensions[data.device.vendor] || '.txt';
+                    a.download = `${data.site_info.name.replace(/\s+/g, '_')}_${data.device.vendor}${ext}`;
+
                     a.click();
                     window.URL.revokeObjectURL(url);
                     showAlert('Archivo descargado', 'success');

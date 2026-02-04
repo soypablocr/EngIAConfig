@@ -58,20 +58,25 @@ def download_config():
             'bigleaf': '.json',
             'cato': '.json'
         }
-        ext = extensions.get(result['vendor'], '.txt')
-        filename = f"{result['site_name']}_{result['vendor']}{ext}"
+        vendor = result.get('vendor', 'generic')
+        ext = extensions.get(vendor.lower(), '.txt')
+        site_name = result.get('site_name', 'config').replace(' ', '_')
+        filename = f"{site_name}_{vendor}{ext}"
         
         # Crear archivo en memoria
         buffer = io.BytesIO()
         buffer.write(result['config'].encode('utf-8'))
         buffer.seek(0)
         
-        return send_file(
+        response = send_file(
             buffer,
             as_attachment=True,
             download_name=filename,
             mimetype='text/plain'
         )
+        # Agregar header para que el frontend pueda leer el nombre sugerido si es necesario
+        response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+        return response
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500

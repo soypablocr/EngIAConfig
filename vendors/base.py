@@ -63,3 +63,20 @@ class VendorConfig(ABC):
             "UTC": "+00:00"
         }
         return timezone_map.get(timezone, "+00:00")
+
+    def _cidr_from_mask(self, mask: str) -> int:
+        """Convierte subnet mask a notación CIDR"""
+        try:
+            return sum([bin(int(x)).count('1') for x in mask.split('.')])
+        except (ValueError, AttributeError):
+            return 24
+
+    def _network_address(self, ip: str, mask: str) -> str:
+        """Calcula la dirección de red"""
+        try:
+            ip_parts = [int(x) for x in ip.split('.')]
+            mask_parts = [int(x) for x in mask.split('.')]
+            network = [ip_parts[i] & mask_parts[i] for i in range(4)]
+            return '.'.join(map(str, network))
+        except (ValueError, AttributeError, IndexError):
+            return ip

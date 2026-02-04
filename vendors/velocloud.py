@@ -223,6 +223,3 @@ class VelocloudConfig(VendorConfig):
 # POST /configuration/updateConfigurationModule (Firewall)
 {json.dumps(firewall, indent=2)}
 '''
-    
-    def _cidr_from_mask(self, mask: str) -> int:
-        return sum([bin(int(x)).count('1') for x in mask.split('.')])
