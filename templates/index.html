@@ -433,42 +433,120 @@
 
                 <!-- LAN -->
                 <div class="card" style="margin-top: 1rem;">
-                    <h2>🏠 Configuración LAN</h2>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>🏠 Configuración LAN</h2>
+                        <button type="button" id="add_lan_btn" class="add-interface-btn" onclick="addLanInterface()">
+                            <span>+</span> Agregar LAN
+                        </button>
+                    </div>
 
-                    <div class="interface-section">
-                        <h3>LAN / VLAN</h3>
+                    <div id="lan1_section" class="interface-section">
+                        <h3>LAN 1 / VLAN</h3>
                         <div class="row">
                             <div class="form-group">
                                 <label>IP Address *</label>
-                                <input type="text" id="lan_ip" placeholder="192.168.1.1">
+                                <input type="text" id="lan1_ip" placeholder="192.168.1.1">
                             </div>
                             <div class="form-group">
                                 <label>Subnet Mask *</label>
-                                <input type="text" id="lan_mask" placeholder="255.255.255.0">
+                                <input type="text" id="lan1_mask" placeholder="255.255.255.0">
                             </div>
                         </div>
                         <div class="row">
                             <div class="form-group">
                                 <label>VLAN ID</label>
-                                <input type="number" id="lan_vlan" placeholder="10">
+                                <input type="number" id="lan1_vlan" placeholder="10">
                             </div>
                             <div class="form-group">
                                 <label>VLAN Name</label>
-                                <input type="text" id="lan_vlan_name" placeholder="Data">
+                                <input type="text" id="lan1_vlan_name" placeholder="Data">
                             </div>
                         </div>
                         <div class="checkbox-group form-group">
-                            <input type="checkbox" id="dhcp_enabled" checked>
-                            <label for="dhcp_enabled">Habilitar DHCP Server</label>
+                            <input type="checkbox" id="lan1_dhcp_enabled" checked>
+                            <label for="lan1_dhcp_enabled">Habilitar DHCP Server</label>
                         </div>
-                        <div class="row" id="dhcp_range">
+                        <div class="row" id="lan1_dhcp_range">
                             <div class="form-group">
                                 <label>DHCP Range Start</label>
-                                <input type="text" id="dhcp_start" placeholder="192.168.1.100">
+                                <input type="text" id="lan1_dhcp_start" placeholder="192.168.1.100">
                             </div>
                             <div class="form-group">
                                 <label>DHCP Range End</label>
-                                <input type="text" id="dhcp_end" placeholder="192.168.1.200">
+                                <input type="text" id="lan1_dhcp_end" placeholder="192.168.1.200">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional LANs -->
+                    <div id="lan2_section" class="interface-section hidden">
+                        <h3>LAN 2 / VLAN</h3>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>IP Address</label>
+                                <input type="text" id="lan2_ip" placeholder="192.168.2.1">
+                            </div>
+                            <div class="form-group">
+                                <label>Subnet Mask</label>
+                                <input type="text" id="lan2_mask" placeholder="255.255.255.0">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>VLAN ID</label>
+                                <input type="number" id="lan2_vlan" placeholder="20">
+                            </div>
+                            <div class="form-group">
+                                <label>VLAN Name</label>
+                                <input type="text" id="lan2_vlan_name" placeholder="Voice">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="lan3_section" class="interface-section hidden">
+                        <h3>LAN 3 / VLAN</h3>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>IP Address</label>
+                                <input type="text" id="lan3_ip" placeholder="192.168.3.1">
+                            </div>
+                            <div class="form-group">
+                                <label>Subnet Mask</label>
+                                <input type="text" id="lan3_mask" placeholder="255.255.255.0">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>VLAN ID</label>
+                                <input type="number" id="lan3_vlan" placeholder="30">
+                            </div>
+                            <div class="form-group">
+                                <label>VLAN Name</label>
+                                <input type="text" id="lan3_vlan_name" placeholder="Guest">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="lan4_section" class="interface-section hidden">
+                        <h3>LAN 4 / VLAN</h3>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>IP Address</label>
+                                <input type="text" id="lan4_ip" placeholder="192.168.4.1">
+                            </div>
+                            <div class="form-group">
+                                <label>Subnet Mask</label>
+                                <input type="text" id="lan4_mask" placeholder="255.255.255.0">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>VLAN ID</label>
+                                <input type="number" id="lan4_vlan" placeholder="40">
+                            </div>
+                            <div class="form-group">
+                                <label>VLAN Name</label>
+                                <input type="text" id="lan4_vlan_name" placeholder="IoT">
                             </div>
                         </div>
                     </div>
@@ -600,18 +678,25 @@
                 }
             }
 
-            // LAN
-            if (document.getElementById('lan_ip').value) {
-                data.lan_interfaces.push({
-                    interface_name: 'lan',
-                    ip_address: document.getElementById('lan_ip').value,
-                    subnet_mask: document.getElementById('lan_mask').value,
-                    vlan_id: parseInt(document.getElementById('lan_vlan').value) || null,
-                    vlan_name: document.getElementById('lan_vlan_name').value || 'LAN',
-                    dhcp_enabled: document.getElementById('dhcp_enabled').checked,
-                    dhcp_range_start: document.getElementById('dhcp_start').value,
-                    dhcp_range_end: document.getElementById('dhcp_end').value
-                });
+            // LAN Interfaces (1-4)
+            for (let i = 1; i <= 4; i++) {
+                const ipInput = document.getElementById(`lan${i}_ip`);
+                if (ipInput && ipInput.value) {
+                    const dhcpEnabledCheck = document.getElementById(`lan${i}_dhcp_enabled`);
+                    const dhcpStartInput = document.getElementById(`lan${i}_dhcp_start`);
+                    const dhcpEndInput = document.getElementById(`lan${i}_dhcp_end`);
+
+                    data.lan_interfaces.push({
+                        interface_name: i === 1 ? 'lan' : `lan${i}`,
+                        ip_address: ipInput.value,
+                        subnet_mask: document.getElementById(`lan${i}_mask`).value,
+                        vlan_id: parseInt(document.getElementById(`lan${i}_vlan`).value) || null,
+                        vlan_name: document.getElementById(`lan${i}_vlan_name`).value || (i === 1 ? 'LAN' : `VLAN${i}`),
+                        dhcp_enabled: dhcpEnabledCheck ? dhcpEnabledCheck.checked : false,
+                        dhcp_range_start: dhcpStartInput ? dhcpStartInput.value : null,
+                        dhcp_range_end: dhcpEndInput ? dhcpEndInput.value : null
+                    });
+                }
             }
 
             return data;
@@ -633,6 +718,19 @@
 
                 if (visibleWanCount === 4) {
                     document.getElementById('add_wan_btn').style.display = 'none';
+                }
+            }
+        }
+
+        let visibleLanCount = 1;
+
+        function addLanInterface() {
+            if (visibleLanCount < 4) {
+                visibleLanCount++;
+                document.getElementById(`lan${visibleLanCount}_section`).classList.remove('hidden');
+
+                if (visibleLanCount === 4) {
+                    document.getElementById('add_lan_btn').style.display = 'none';
                 }
             }
         }
