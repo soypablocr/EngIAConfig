@@ -37,7 +37,9 @@ class FortinetConfig(VendorConfig):
 # FortiGate Configuration
 # Site: {site.get('name', 'UNNAMED')}
 # Customer: {site.get('customer', 'UNNAMED')}
+# Firmware: {params.get('device', {}).get('firmware_version', 'Unknown')}
 # Generated automatically - Review before applying
+
 # ============================================
 
 # --- System Global Settings ---

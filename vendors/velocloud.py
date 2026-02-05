@@ -46,6 +46,7 @@ class VelocloudConfig(VendorConfig):
 # VMware SD-WAN (Velocloud) Configuration
 # Site: {site.get('name', 'UNNAMED')}
 # Customer: {site.get('customer', 'UNNAMED')}
+# Firmware: {params.get('device', {}).get('firmware_version', 'Unknown')}
 # ============================================
 # Note: Velocloud uses VCO API for configuration
 # Below are the API calls and JSON payloads needed

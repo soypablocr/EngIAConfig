@@ -199,6 +199,29 @@
         .checkbox-group input {
             width: auto;
         }
+
+        .hidden {
+            display: none;
+        }
+
+        .add-interface-btn {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 1rem 0;
+            transition: background-color 0.2s;
+        }
+
+        .add-interface-btn:hover {
+            background-color: #2980b9;
+        }
     </style>
 </head>
 
@@ -266,19 +289,33 @@
                             </select>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label>Política de Seguridad</label>
-                        <select id="policy_template">
-                            <option value="basic">Básica - Solo NAT y acceso saliente</option>
-                            <option value="standard" selected>Estándar - Web filter, App control</option>
-                            <option value="advanced">Avanzada - IPS, Antivirus, SSL</option>
-                        </select>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Versión de Firmware *</label>
+                            <select id="firmware_version">
+                                <option>Seleccione vendor primero</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Política de Seguridad</label>
+                            <select id="policy_template">
+                                <option value="basic">Básica - Solo NAT y acceso saliente</option>
+                                <option value="standard" selected>Estándar - Web filter, App control</option>
+                                <option value="advanced">Avanzada - IPS, Antivirus, SSL</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
+
                 <!-- WAN -->
                 <div class="card" style="margin-top: 1rem;">
-                    <h2>🌐 Configuración WAN</h2>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>🌐 Configuración WAN</h2>
+                        <button type="button" id="add_wan_btn" class="add-interface-btn" onclick="addWanInterface()">
+                            <span>+</span> Agregar WAN
+                        </button>
+                    </div>
 
                     <div class="interface-section">
                         <h3>WAN 1 (Primario)</h3>
@@ -308,8 +345,8 @@
                         </div>
                     </div>
 
-                    <div class="interface-section">
-                        <h3>WAN 2 (Secundario - Opcional)</h3>
+                    <div id="wan2_section" class="interface-section hidden">
+                        <h3>WAN 2 (Secundario)</h3>
                         <div class="row">
                             <div class="form-group">
                                 <label>IP Address</label>
@@ -335,7 +372,64 @@
                             <input type="text" id="wan2_isp" placeholder="ISP-Backup">
                         </div>
                     </div>
+
+                    <div id="wan3_section" class="interface-section hidden">
+                        <h3>WAN 3 (Opcional)</h3>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>IP Address</label>
+                                <input type="text" id="wan3_ip" placeholder="10.0.0.10">
+                            </div>
+                            <div class="form-group">
+                                <label>Subnet Mask</label>
+                                <input type="text" id="wan3_mask" placeholder="255.255.255.0">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>Gateway</label>
+                                <input type="text" id="wan3_gw" placeholder="10.0.0.1">
+                            </div>
+                            <div class="form-group">
+                                <label>Bandwidth (Mbps)</label>
+                                <input type="number" id="wan3_bw" value="50">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>ISP Name</label>
+                            <input type="text" id="wan3_isp" placeholder="ISP-WAN3">
+                        </div>
+                    </div>
+
+                    <div id="wan4_section" class="interface-section hidden">
+                        <h3>WAN 4 (Opcional)</h3>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>IP Address</label>
+                                <input type="text" id="wan4_ip" placeholder="10.0.1.10">
+                            </div>
+                            <div class="form-group">
+                                <label>Subnet Mask</label>
+                                <input type="text" id="wan4_mask" placeholder="255.255.255.0">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>Gateway</label>
+                                <input type="text" id="wan4_gw" placeholder="10.0.1.1">
+                            </div>
+                            <div class="form-group">
+                                <label>Bandwidth (Mbps)</label>
+                                <input type="number" id="wan4_bw" value="50">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>ISP Name</label>
+                            <input type="text" id="wan4_isp" placeholder="ISP-WAN4">
+                        </div>
+                    </div>
                 </div>
+
 
                 <!-- LAN -->
                 <div class="card" style="margin-top: 1rem;">
@@ -416,25 +510,52 @@
     </div>
 
     <script>
-        // Modelos por vendor
-        const vendorModels = {
-            fortinet: ["FortiGate 40F", "FortiGate 60F", "FortiGate 70F", "FortiGate 80F", "FortiGate 100F", "FortiGate 200F"],
-            meraki: ["MX64", "MX67", "MX68", "MX75", "MX84", "MX85", "MX95", "MX100"],
-            velocloud: ["Edge 510", "Edge 520", "Edge 610", "Edge 620", "Edge 710", "Edge 840"],
-            bigleaf: ["Bigleaf Edge 100", "Bigleaf Edge 200", "Bigleaf Edge 500"],
-            cato: ["Socket X1500", "Socket X1600", "Socket X1700"]
+        // Datos por vendor
+        const vendorData = {
+            fortinet: {
+                models: ["FortiGate 40F", "FortiGate 60F", "FortiGate 70F", "FortiGate 80F", "FortiGate 100F", "FortiGate 200F"],
+                firmwares: ["7.4.2 (Latest Stable)", "7.2.7 (LTS)", "7.0.13 (Legacy Stable)"]
+            },
+            meraki: {
+                models: ["MX64", "MX67", "MX68", "MX75", "MX84", "MX85", "MX95", "MX100"],
+                firmwares: ["MX 18.2 (Stable)", "MX 17.x (Previous)", "MX 16.x (Legacy)"]
+            },
+            velocloud: {
+                models: ["Edge 510", "Edge 520", "Edge 610", "Edge 620", "Edge 710", "Edge 840"],
+                firmwares: ["5.2.0 (New)", "5.1.0 (Stable)", "4.5.2 (Recommended)"]
+            },
+            bigleaf: {
+                models: ["Bigleaf Edge 100", "Bigleaf Edge 200", "Bigleaf Edge 500"],
+                firmwares: ["2.3.x (Current)", "2.2.x", "1.9.y"]
+            },
+            cato: {
+                models: ["Socket X1500", "Socket X1600", "Socket X1700"],
+                firmwares: ["v5.2 (Latest)", "v5.1", "v5.0 (Stable)"]
+            }
         };
 
         function loadModels() {
             const vendor = document.getElementById('vendor').value;
             const modelSelect = document.getElementById('model');
-            modelSelect.innerHTML = '';
+            const firmwareSelect = document.getElementById('firmware_version');
 
-            vendorModels[vendor].forEach(model => {
+            modelSelect.innerHTML = '';
+            firmwareSelect.innerHTML = '';
+
+            // Cargar modelos
+            vendorData[vendor].models.forEach(model => {
                 const option = document.createElement('option');
                 option.value = model;
                 option.textContent = model;
                 modelSelect.appendChild(option);
+            });
+
+            // Cargar firmwares
+            vendorData[vendor].firmwares.forEach(fw => {
+                const option = document.createElement('option');
+                option.value = fw;
+                option.textContent = fw;
+                firmwareSelect.appendChild(option);
             });
         }
 
@@ -448,7 +569,8 @@
                 },
                 device: {
                     vendor: document.getElementById('vendor').value,
-                    model: document.getElementById('model').value
+                    model: document.getElementById('model').value,
+                    firmware_version: document.getElementById('firmware_version').value
                 },
                 wan_interfaces: [],
                 lan_interfaces: [],
@@ -462,30 +584,20 @@
                 policy_template: document.getElementById('policy_template').value
             };
 
-            // WAN 1
-            if (document.getElementById('wan1_ip').value) {
-                data.wan_interfaces.push({
-                    interface_name: 'wan1',
-                    ip_address: document.getElementById('wan1_ip').value,
-                    subnet_mask: document.getElementById('wan1_mask').value,
-                    gateway: document.getElementById('wan1_gw').value,
-                    bandwidth_mbps: parseInt(document.getElementById('wan1_bw').value) || 100,
-                    isp_name: document.getElementById('wan1_isp').value || 'WAN-Primary',
-                    priority: 'primary'
-                });
-            }
-
-            // WAN 2
-            if (document.getElementById('wan2_ip').value) {
-                data.wan_interfaces.push({
-                    interface_name: 'wan2',
-                    ip_address: document.getElementById('wan2_ip').value,
-                    subnet_mask: document.getElementById('wan2_mask').value,
-                    gateway: document.getElementById('wan2_gw').value,
-                    bandwidth_mbps: parseInt(document.getElementById('wan2_bw').value) || 50,
-                    isp_name: document.getElementById('wan2_isp').value || 'WAN-Backup',
-                    priority: 'secondary'
-                });
+            // WAN Interfaces (1-4)
+            for (let i = 1; i <= 4; i++) {
+                const ipInput = document.getElementById(`wan${i}_ip`);
+                if (ipInput && ipInput.value) {
+                    data.wan_interfaces.push({
+                        interface_name: `wan${i}`,
+                        ip_address: ipInput.value,
+                        subnet_mask: document.getElementById(`wan${i}_mask`).value,
+                        gateway: document.getElementById(`wan${i}_gw`).value,
+                        bandwidth_mbps: parseInt(document.getElementById(`wan${i}_bw`).value) || (i === 1 ? 100 : 50),
+                        isp_name: document.getElementById(`wan${i}_isp`).value || `WAN-${i}`,
+                        priority: i === 1 ? 'primary' : 'secondary'
+                    });
+                }
             }
 
             // LAN
@@ -505,10 +617,24 @@
             return data;
         }
 
+
         function showAlert(message, type = 'error') {
             const alertsDiv = document.getElementById('alerts');
             alertsDiv.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
             setTimeout(() => alertsDiv.innerHTML = '', 5000);
+        }
+
+        let visibleWanCount = 1;
+
+        function addWanInterface() {
+            if (visibleWanCount < 4) {
+                visibleWanCount++;
+                document.getElementById(`wan${visibleWanCount}_section`).classList.remove('hidden');
+
+                if (visibleWanCount === 4) {
+                    document.getElementById('add_wan_btn').style.display = 'none';
+                }
+            }
         }
 
         async function generateConfig() {

@@ -52,6 +52,10 @@ class ConfigValidator:
         
         if not device.get('model'):
             self.errors.append("device.model es requerido")
+        
+        if not device.get('firmware_version'):
+            self.errors.append("device.firmware_version es requerido")
+
     
     def _validate_wan_interfaces(self, wan_interfaces: list):
         if not wan_interfaces:

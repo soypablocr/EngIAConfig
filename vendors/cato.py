@@ -41,6 +41,7 @@ class CatoConfig(VendorConfig):
 # Site: {site.get('name', 'UNNAMED')}
 # Customer: {site.get('customer', 'UNNAMED')}
 # Model: {device.get('model', 'Socket')}
+# Firmware: {device.get('firmware_version', 'Unknown')}
 # ============================================
 # Note: CATO uses GraphQL API for configuration
 # Below are the mutations needed

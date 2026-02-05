@@ -30,6 +30,7 @@ class BigleafConfig(VendorConfig):
 # Bigleaf Networks Configuration
 # Site: {site.get('name', 'UNNAMED')}
 # Customer: {site.get('customer', 'UNNAMED')}
+# Firmware: {params.get('device', {}).get('firmware_version', 'Unknown')}
 # ============================================
 # Note: Bigleaf uses Cloud Portal for most configuration
 # Below is the configuration checklist and API calls

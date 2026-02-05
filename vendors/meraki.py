@@ -39,6 +39,7 @@ class MerakiConfig(VendorConfig):
 # Meraki MX Configuration
 # Site: {site.get('name', 'UNNAMED')}
 # Customer: {site.get('customer', 'UNNAMED')}
+# Firmware: {params.get('device', {}).get('firmware_version', 'Unknown')}
 # ============================================
 # Note: Meraki uses Dashboard API for configuration
 # Below are the API calls needed to configure this device
@@ -58,6 +59,9 @@ class MerakiConfig(VendorConfig):
             "wan2": None
         }
         
+        if len(wan_params) > 2:
+            self.add_error("Meraki MX solo soporta hasta 2 interfaces WAN. Las interfaces adicionales serán ignoradas.")
+
         for idx, wan in enumerate(wan_params[:2]):  # Meraki MX has max 2 WAN
             uplink_key = f"wan{idx + 1}"
             uplink_config[uplink_key] = {
