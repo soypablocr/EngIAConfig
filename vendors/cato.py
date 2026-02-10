@@ -1,5 +1,6 @@
 from .base import VendorConfig
 import json
+from typing import List, Tuple
 
 class CatoConfig(VendorConfig):
     """Generador de configuración para CATO Networks"""
@@ -198,3 +199,15 @@ class CatoConfig(VendorConfig):
         mask_parts = [int(x) for x in mask.split('.')]
         network = [ip_parts[i] & mask_parts[i] for i in range(4)]
         return '.'.join(map(str, network))
+
+    def validate_custom_rules(self, params: dict) -> Tuple[bool, List[str], List[str]]:
+        """Validaciones específicas para CATO"""
+        errors = []
+        warnings = []
+        
+        # Regla: CATO requiere siteType y countryCode (aunque aquí siteType está fijo en BRANCH)
+        site = params.get('site_info', {})
+        if not site.get('location'):
+            warnings.append("CATO requiere una dirección física para el Site Location para mayor precisión en el portal")
+            
+        return len(errors) == 0, errors, warnings

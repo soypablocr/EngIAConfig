@@ -64,6 +64,21 @@ class NetworkConfigGenerator:
         if not vendor_config.validate_model(model):
             warnings.append(f"Modelo '{model}' no está en la lista de modelos soportados para {vendor_name}")
         
+        # Paso 3.5: Validaciones específicas del vendor
+        is_custom_valid, custom_errors, custom_warnings = vendor_config.validate_custom_rules(params)
+        errors.extend(custom_errors)
+        warnings.extend(custom_warnings)
+        
+        if not is_custom_valid:
+            return {
+                'success': False,
+                'errors': errors,
+                'warnings': warnings,
+                'config': None,
+                'vendor': vendor_name,
+                'site_name': params.get('site_info', {}).get('name', 'Unknown')
+            }
+        
         # Paso 4: Generar configuración
         try:
             vendor_config.generate_base_config(params)

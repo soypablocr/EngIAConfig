@@ -1,5 +1,6 @@
 from .base import VendorConfig
 import json
+from typing import List, Tuple
 
 class VelocloudConfig(VendorConfig):
     """Generador de configuración para VMware SD-WAN (Velocloud)"""
@@ -224,3 +225,15 @@ class VelocloudConfig(VendorConfig):
 # POST /configuration/updateConfigurationModule (Firewall)
 {json.dumps(firewall, indent=2)}
 '''
+
+    def validate_custom_rules(self, params: dict) -> Tuple[bool, List[str], List[str]]:
+        """Validaciones específicas para Velocloud"""
+        errors = []
+        warnings = []
+        
+        # Regla: Al menos una interfaz LAN
+        lan_interfaces = params.get('lan_interfaces', [])
+        if not lan_interfaces:
+            errors.append("Velocloud requiere al menos una interfaz LAN configurada")
+            
+        return len(errors) == 0, errors, warnings

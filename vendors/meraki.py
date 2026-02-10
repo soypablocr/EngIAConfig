@@ -1,5 +1,6 @@
 from .base import VendorConfig
 import json
+from typing import List, Tuple
 
 class MerakiConfig(VendorConfig):
     """Generador de configuración para Cisco Meraki MX"""
@@ -60,7 +61,7 @@ class MerakiConfig(VendorConfig):
         }
         
         if len(wan_params) > 2:
-            self.add_error("Meraki MX solo soporta hasta 2 interfaces WAN. Las interfaces adicionales serán ignoradas.")
+            pass # Validation is now handled in validate_custom_rules
 
         for idx, wan in enumerate(wan_params[:2]):  # Meraki MX has max 2 WAN
             uplink_key = f"wan{idx + 1}"
@@ -284,3 +285,15 @@ dashboard = meraki.DashboardAPI(API_KEY)
             script += f"# Payload: {json.dumps(call['payload'])}\n"
         
         return script
+
+    def validate_custom_rules(self, params: dict) -> Tuple[bool, List[str], List[str]]:
+        """Validaciones específicas para Meraki"""
+        errors = []
+        warnings = []
+        
+        # Regla: Máximo 2 interfaces WAN
+        wan_interfaces = params.get('wan_interfaces', [])
+        if len(wan_interfaces) > 2:
+            errors.append(f"Meraki MX solo soporta hasta 2 interfaces WAN (se recibieron {len(wan_interfaces)})")
+            
+        return len(errors) == 0, errors, warnings

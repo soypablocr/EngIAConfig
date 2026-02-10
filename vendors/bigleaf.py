@@ -1,5 +1,6 @@
 from .base import VendorConfig
 import json
+from typing import List, Tuple
 
 class BigleafConfig(VendorConfig):
     """Generador de configuración para Bigleaf Networks"""
@@ -116,6 +117,18 @@ class BigleafConfig(VendorConfig):
 # - Default: Best effort
 # - Bulk/Background: Low priority (when needed)
 '''
-        
         self.config_sections.append(config)
         return config
+
+    def validate_custom_rules(self, params: dict) -> Tuple[bool, List[str], List[str]]:
+        """Validaciones específicas para Bigleaf"""
+        errors = []
+        warnings = []
+        
+        # Regla: Bigleaf no soporta VLANs directamente según la nota en apply_lan_config
+        lan_interfaces = params.get('lan_interfaces', [])
+        for idx, lan in enumerate(lan_interfaces):
+            if lan.get('vlan_id') and lan.get('vlan_id') > 0:
+                warnings.append(f"Bigleaf no soporta VLANs directamente (VLAN {lan['vlan_id']}). Debe configurarse en el switch aguas arriba.")
+                
+        return len(errors) == 0, errors, warnings

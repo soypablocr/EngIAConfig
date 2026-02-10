@@ -1,4 +1,5 @@
 from .base import VendorConfig
+from typing import List, Tuple
 
 class FortinetConfig(VendorConfig):
     """Generador de configuración para FortiGate"""
@@ -410,3 +411,20 @@ config firewall ssl-ssh-profile
     next
 end
 '''
+
+    def validate_custom_rules(self, params: dict) -> Tuple[bool, List[str], List[str]]:
+        """Validaciones específicas para Fortinet"""
+        errors = []
+        warnings = []
+        
+        # Regla: Máximo 4 interfaces WAN
+        wan_interfaces = params.get('wan_interfaces', [])
+        if len(wan_interfaces) > 4:
+            errors.append(f"Fortinet soporta un máximo de 4 interfaces WAN en este motor (se recibieron {len(wan_interfaces)})")
+        
+        # Regla: Verificar si el modelo es 40F (solo tiene 1 WAN física dedicada por lo general, aunque aquí es lógico)
+        model = params.get('device', {}).get('model', '')
+        if "40F" in model and len(wan_interfaces) > 2:
+            warnings.append(f"El modelo {model} típicamente tiene recursos limitados para más de 2 WANs")
+            
+        return len(errors) == 0, errors, warnings

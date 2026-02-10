@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import json
 
 class VendorConfig(ABC):
@@ -17,22 +17,27 @@ class VendorConfig(ABC):
     @abstractmethod
     def generate_base_config(self, params: dict) -> str:
         """Genera configuración base del dispositivo"""
-        pass
+        raise NotImplementedError
     
     @abstractmethod
     def apply_wan_config(self, wan_params: list) -> str:
         """Aplica configuración de interfaces WAN"""
-        pass
+        raise NotImplementedError
     
     @abstractmethod
     def apply_lan_config(self, lan_params: list) -> str:
         """Aplica configuración de interfaces LAN"""
-        pass
+        raise NotImplementedError
     
     @abstractmethod
     def apply_policies(self, policy_set: str) -> str:
         """Aplica políticas de seguridad y QoS"""
-        pass
+        raise NotImplementedError
+    
+    @abstractmethod
+    def validate_custom_rules(self, params: dict) -> Tuple[bool, List[str], List[str]]:
+        """Hook para validaciones específicas del vendor"""
+        raise NotImplementedError
     
     def validate_model(self, model: str) -> bool:
         """Valida si el modelo es soportado"""
@@ -46,7 +51,7 @@ class VendorConfig(ABC):
         """Agrega un error a la lista"""
         self.errors.append(error)
     
-    def export_config(self, format: str = None) -> str:
+    def export_config(self, format: Optional[str] = None) -> str:
         """Exporta la configuración en el formato especificado"""
         return "\n".join(self.config_sections)
     
