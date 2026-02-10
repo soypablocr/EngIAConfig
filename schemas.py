@@ -34,10 +34,26 @@ class WanInterface(BaseModel):
     @field_validator('subnet_mask')
     @classmethod
     def validate_mask(cls, v: str) -> str:
+        # Handle CIDR (e.g. /24 or 24)
+        if v.startswith('/') or v.isdigit():
+            try:
+                prefix = v.replace('/', '')
+                # Validate it's a valid CIDR prefix
+                if not prefix.isdigit():
+                     raise ValueError()
+                prefix_val = int(prefix)
+                if not (0 <= prefix_val <= 32):
+                    raise ValueError("CIDR prefix must be between 0 and 32")
+                return str(ipaddress.IPv4Network(f"0.0.0.0/{prefix_val}").netmask)
+            except (ValueError, TypeError):
+                if v.startswith('/') or v.isdigit():
+                    raise ValueError(f"Invalid CIDR notation: {v}")
+
+        # Handle dotted decimal
         try:
             parts = [int(x) for x in v.split('.')]
             if len(parts) != 4:
-                raise ValueError("Invalidad mask format")
+                raise ValueError("Invalid mask format")
             binary = ''.join([format(x, '08b') for x in parts])
             if '01' in binary:
                 raise ValueError("Invalid mask (broken sequence of 1s and 0s)")

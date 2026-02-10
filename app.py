@@ -49,6 +49,8 @@ def generate_config():
         return jsonify(result)
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/download', methods=['POST'])
@@ -84,6 +86,8 @@ def download_config():
         return response
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/validate', methods=['POST'])
@@ -103,6 +107,84 @@ def validate_params():
         })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/push/meraki', methods=['POST'])
+@require_api_key
+def push_meraki():
+    """Genera y empuja configuración a Meraki Dashboard"""
+    try:
+        data = request.json
+        params = data.get('params')
+        api_key = data.get('meraki_api_key')
+        network_id = data.get('network_id')
+        
+        if not all([params, api_key, network_id]):
+            return jsonify({'error': 'Faltan parámetros (params, meraki_api_key, network_id)'}), 400
+            
+        # 1. Generar la configuración
+        result = generator.generate(params)
+        if not result.get('success'):
+            return jsonify(result), 400
+            
+        if result.get('format') != 'json':
+            return jsonify({'error': 'La configuración generada no es de formato JSON (Meraki expected)'}), 400
+            
+        # 2. Empujar a la API
+        from integrations.meraki_api import MerakiIntegration
+        integration = MerakiIntegration(api_key)
+        push_result = integration.push_configuration(network_id, result['content'])
+        
+        return jsonify({
+            'success': push_result['success'],
+            'push_details': push_result.get('details', []),
+            'error': push_result.get('error'),
+            'config_generated': True
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/push/cato', methods=['POST'])
+@require_api_key
+def push_cato():
+    """Genera y empuja configuración a Cato Networks (GraphQL)"""
+    try:
+        data = request.json
+        params = data.get('params')
+        api_key = data.get('cato_api_key')
+        account_id = data.get('account_id')
+        
+        if not all([params, api_key, account_id]):
+            return jsonify({'error': 'Faltan parámetros (params, cato_api_key, account_id)'}), 400
+            
+        # 1. Generar la configuración
+        result = generator.generate(params)
+        if not result.get('success'):
+            return jsonify(result), 400
+            
+        if result.get('format') != 'graphql':
+            return jsonify({'error': 'La configuración generada no es de formato GraphQL (Cato expected)'}), 400
+            
+        # 2. Empujar a la API
+        from integrations.cato_api import CatoIntegration
+        integration = CatoIntegration(api_key, account_id)
+        push_result = integration.push_site_configuration(result['content'])
+        
+        return jsonify({
+            'success': push_result['success'],
+            'push_details': push_result.get('details', []),
+            'error': push_result.get('error'),
+            'config_generated': True
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

@@ -305,6 +305,14 @@
                             </select>
                         </div>
                     </div>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>EngIA API Key (X-API-Key)</label>
+                            <input type="password" id="api_key" placeholder="devkey" value="devkey">
+                            <small style="color: var(--text-light); font-size: 0.7rem;">Requerida para autorizar la
+                                generación.</small>
+                        </div>
+                    </div>
                 </div>
 
 
@@ -594,17 +602,17 @@
             try {
                 const response = await fetch('/api/catalog');
                 catalogData = await response.json();
-                
+
                 const vendorSelect = document.getElementById('vendor');
                 vendorSelect.innerHTML = '';
-                
+
                 Object.keys(catalogData).forEach(vendor => {
                     const option = document.createElement('option');
                     option.value = vendor;
                     option.textContent = vendor.charAt(0).toUpperCase() + vendor.slice(1);
                     vendorSelect.appendChild(option);
                 });
-                
+
                 loadModels();
             } catch (error) {
                 showAlert('Error cargando catálogo: ' + error.message, 'error');
@@ -742,7 +750,10 @@
             try {
                 const response = await fetch('/api/generate', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': document.getElementById('api_key').value
+                    },
                     body: JSON.stringify(data)
                 });
 
@@ -754,15 +765,16 @@
                     } else {
                         document.getElementById('output').textContent = result.config;
                     }
-                    
+
                     if (result.warnings && result.warnings.length > 0) {
                         showAlert('Advertencias: ' + result.warnings.join(', '), 'warning');
                     } else {
                         showAlert('Configuración generada exitosamente', 'success');
                     }
                 } else {
-                    document.getElementById('output').textContent = 'Error: ' + (result.errors || []).join('\n');
-                    showAlert('Errores: ' + (result.errors || ['Error desconocido']).join(', '), 'error');
+                    const errorMsg = result.errors ? result.errors.join('\n') : (result.error || 'Error desconocido');
+                    document.getElementById('output').textContent = 'Error: ' + errorMsg;
+                    showAlert('Error: ' + errorMsg, 'error');
                 }
             } catch (error) {
                 showAlert('Error de conexión: ' + error.message, 'error');
@@ -775,7 +787,10 @@
             try {
                 const response = await fetch('/api/download', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': document.getElementById('api_key').value
+                    },
                     body: JSON.stringify(data)
                 });
 
@@ -812,7 +827,7 @@
         fetchCatalog();
 
         // Toggle DHCP fields for LANs
-        document.addEventListener('change', function(e) {
+        document.addEventListener('change', function (e) {
             if (e.target && e.target.id && e.target.id.endsWith('_dhcp_enabled')) {
                 const idPrefix = e.target.id.replace('_dhcp_enabled', '');
                 const rangeDiv = document.getElementById(`${idPrefix}_dhcp_range`);

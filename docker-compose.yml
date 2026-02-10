@@ -1,0 +1,12 @@
+services:
+  web:
+    build: .
+    ports:
+      - "5005:5005"
+    volumes:
+      - .:/app
+    environment:
+      - FLASK_ENV=development
+      - ENGIA_API_KEY=devkey
+    stdin_open: true
+    tty: true
