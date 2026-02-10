@@ -588,40 +588,41 @@
     </div>
 
     <script>
-        // Datos por vendor
-        const vendorData = {
-            fortinet: {
-                models: ["FortiGate 40F", "FortiGate 60F", "FortiGate 70F", "FortiGate 80F", "FortiGate 100F", "FortiGate 200F"],
-                firmwares: ["7.4.2 (Latest Stable)", "7.2.7 (LTS)", "7.0.13 (Legacy Stable)"]
-            },
-            meraki: {
-                models: ["MX64", "MX67", "MX68", "MX75", "MX84", "MX85", "MX95", "MX100"],
-                firmwares: ["MX 18.2 (Stable)", "MX 17.x (Previous)", "MX 16.x (Legacy)"]
-            },
-            velocloud: {
-                models: ["Edge 510", "Edge 520", "Edge 610", "Edge 620", "Edge 710", "Edge 840"],
-                firmwares: ["5.2.0 (New)", "5.1.0 (Stable)", "4.5.2 (Recommended)"]
-            },
-            bigleaf: {
-                models: ["Bigleaf Edge 100", "Bigleaf Edge 200", "Bigleaf Edge 500"],
-                firmwares: ["2.3.x (Current)", "2.2.x", "1.9.y"]
-            },
-            cato: {
-                models: ["Socket X1500", "Socket X1600", "Socket X1700"],
-                firmwares: ["v5.2 (Latest)", "v5.1", "v5.0 (Stable)"]
+        let catalogData = {};
+
+        async function fetchCatalog() {
+            try {
+                const response = await fetch('/api/catalog');
+                catalogData = await response.json();
+                
+                const vendorSelect = document.getElementById('vendor');
+                vendorSelect.innerHTML = '';
+                
+                Object.keys(catalogData).forEach(vendor => {
+                    const option = document.createElement('option');
+                    option.value = vendor;
+                    option.textContent = vendor.charAt(0).toUpperCase() + vendor.slice(1);
+                    vendorSelect.appendChild(option);
+                });
+                
+                loadModels();
+            } catch (error) {
+                showAlert('Error cargando catálogo: ' + error.message, 'error');
             }
-        };
+        }
 
         function loadModels() {
             const vendor = document.getElementById('vendor').value;
             const modelSelect = document.getElementById('model');
             const firmwareSelect = document.getElementById('firmware_version');
 
+            if (!catalogData[vendor]) return;
+
             modelSelect.innerHTML = '';
             firmwareSelect.innerHTML = '';
 
             // Cargar modelos
-            vendorData[vendor].models.forEach(model => {
+            catalogData[vendor].models.forEach(model => {
                 const option = document.createElement('option');
                 option.value = model;
                 option.textContent = model;
@@ -629,7 +630,7 @@
             });
 
             // Cargar firmwares
-            vendorData[vendor].firmwares.forEach(fw => {
+            catalogData[vendor].firmwares.forEach(fw => {
                 const option = document.createElement('option');
                 option.value = fw;
                 option.textContent = fw;
@@ -748,15 +749,20 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    document.getElementById('output').textContent = result.config;
+                    if (typeof result.config === 'object') {
+                        document.getElementById('output').textContent = JSON.stringify(result.config, null, 2);
+                    } else {
+                        document.getElementById('output').textContent = result.config;
+                    }
+                    
                     if (result.warnings && result.warnings.length > 0) {
                         showAlert('Advertencias: ' + result.warnings.join(', '), 'warning');
                     } else {
                         showAlert('Configuración generada exitosamente', 'success');
                     }
                 } else {
-                    document.getElementById('output').textContent = 'Error: ' + result.errors.join('\n');
-                    showAlert('Errores: ' + result.errors.join(', '), 'error');
+                    document.getElementById('output').textContent = 'Error: ' + (result.errors || []).join('\n');
+                    showAlert('Errores: ' + (result.errors || ['Error desconocido']).join(', '), 'error');
                 }
             } catch (error) {
                 showAlert('Error de conexión: ' + error.message, 'error');
@@ -803,11 +809,17 @@
         }
 
         // Inicializar
-        loadModels();
+        fetchCatalog();
 
-        // Toggle DHCP fields
-        document.getElementById('dhcp_enabled').addEventListener('change', function () {
-            document.getElementById('dhcp_range').style.display = this.checked ? 'grid' : 'none';
+        // Toggle DHCP fields for LANs
+        document.addEventListener('change', function(e) {
+            if (e.target && e.target.id && e.target.id.endsWith('_dhcp_enabled')) {
+                const idPrefix = e.target.id.replace('_dhcp_enabled', '');
+                const rangeDiv = document.getElementById(`${idPrefix}_dhcp_range`);
+                if (rangeDiv) {
+                    rangeDiv.style.display = e.target.checked ? 'grid' : 'none';
+                }
+            }
         });
     </script>
 </body>

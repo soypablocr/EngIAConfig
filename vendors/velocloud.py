@@ -1,6 +1,7 @@
 from .base import VendorConfig
 import json
-from typing import List, Tuple
+from typing import List, Tuple, Any
+from schemas import NetworkParams, WanInterface, LanInterface
 
 class VelocloudConfig(VendorConfig):
     """Generador de configuración para VMware SD-WAN (Velocloud)"""
@@ -14,226 +15,97 @@ class VelocloudConfig(VendorConfig):
         "Edge 840", "Edge 860",
         "Edge 1000", "Edge 3400", "Edge 3800"
     ]
+    SUPPORTED_FIRMWARES = [
+        "5.0.1", "5.1.0", "5.2.0"
+    ]
     
     def __init__(self):
         super().__init__()
-        self.edge_config = {}
+        self.payloads = {}
     
-    def generate_base_config(self, params: dict) -> str:
+    def generate_base_config(self, params: NetworkParams):
         self.params = params
-        site = params.get('site_info', {})
-        device = params.get('device', {})
+        site = params.site_info
         
-        self.edge_config = {
-            "name": site.get('name', 'New Edge'),
-            "description": f"Customer: {site.get('customer', '')} | Location: {site.get('location', '')}",
-            "modelNumber": device.get('model', 'Edge 620'),
+        self.payloads["edge_provision"] = {
+            "name": site.name,
+            "description": f"Customer: {site.customer} | Location: {site.location}",
+            "modelNumber": params.device.model,
             "site": {
-                "name": site.get('name'),
-                "contactName": "",
-                "contactPhone": "",
-                "contactEmail": "",
-                "streetAddress": site.get('location', ''),
-                "city": "",
-                "country": "",
-                "lat": 0.0,
-                "lon": 0.0
+                "name": site.name,
+                "streetAddress": site.location,
             },
-            "haEnabled": False,
-            "haState": "UNCONFIGURED"
+            "haEnabled": False
         }
-        
-        config = f'''# ============================================
-# VMware SD-WAN (Velocloud) Configuration
-# Site: {site.get('name', 'UNNAMED')}
-# Customer: {site.get('customer', 'UNNAMED')}
-# Firmware: {params.get('device', {}).get('firmware_version', 'Unknown')}
-# ============================================
-# Note: Velocloud uses VCO API for configuration
-# Below are the API calls and JSON payloads needed
-
-# --- Edge Provisioning ---
-# POST /edge/edgeProvision
-{json.dumps(self.edge_config, indent=2)}
-'''
-        self.config_sections.append(config)
-        return config
     
-    def apply_wan_config(self, wan_params: list) -> str:
-        config = "\n# --- WAN Link Configuration ---\n"
-        
+    def apply_wan_config(self, wan_params: List[WanInterface]):
         wan_links = []
         for idx, wan in enumerate(wan_params):
             link = {
                 "interface": f"GE{idx + 1}",
-                "internalId": f"WAN{idx + 1}",
-                "name": wan.get('isp_name', f'WAN Link {idx + 1}'),
-                "publicIpAddress": wan['ip_address'],
-                "mode": "STATIC",
+                "name": wan.isp_name or f"WAN_{idx + 1}",
+                "publicIpAddress": str(wan.ip_address),
                 "staticIpConfig": {
-                    "address": wan['ip_address'],
-                    "netmask": wan['subnet_mask'],
-                    "gateway": wan['gateway'],
-                    "wanDns": self.params.get('services', {}).get('dns_servers', ['8.8.8.8'])
+                    "address": str(wan.ip_address),
+                    "netmask": wan.subnet_mask,
+                    "gateway": str(wan.gateway),
+                    "wanDns": [str(d) for d in (self.params.services.dns_servers if self.params.services else ["8.8.8.8"])]
                 },
-                "bwMeasurement": "USER_DEFINED",
-                "uploadMbps": wan.get('bandwidth_mbps', 100),
-                "downloadMbps": wan.get('bandwidth_mbps', 100),
-                "type": "WIRED",
-                "isp": wan.get('isp_name', ''),
-                "enabled": True,
-                "backupOnly": wan.get('priority') != 'primary'
+                "uploadMbps": wan.bandwidth_mbps or 100,
+                "downloadMbps": wan.bandwidth_mbps or 100,
+                "backupOnly": wan.priority != 'primary'
             }
             wan_links.append(link)
-            
-            config += f'''# POST /configuration/updateConfigurationModule (WAN Link {idx + 1})
-{json.dumps({"links": [link]}, indent=2)}
+        self.payloads["wan_links"] = wan_links
 
-'''
-        
-        self.config_sections.append(config)
-        return config
-    
-    def apply_lan_config(self, lan_params: list) -> str:
-        config = "\n# --- LAN/VLAN Configuration ---\n"
-        
+    def apply_lan_config(self, lan_params: List[LanInterface]):
         routed_interfaces = []
         for lan in lan_params:
             interface = {
-                "name": lan.get('vlan_name', 'LAN'),
-                "vlanId": lan.get('vlan_id', 0),
-                "disabled": False,
+                "name": f"LAN_{lan.vlan_id or 'BASE'}",
+                "vlanId": lan.vlan_id or 0,
                 "addressing": {
                     "type": "STATIC",
-                    "cidrIp": f"{lan['ip_address']}/{self._cidr_from_mask(lan['subnet_mask'])}",
-                    "cidrPrefix": self._cidr_from_mask(lan['subnet_mask']),
-                    "netmask": lan['subnet_mask'],
-                    "gateway": lan['ip_address']
+                    "cidrIp": f"{lan.ip_address}/{self._cidr_from_mask(lan.subnet_mask)}",
+                    "gateway": str(lan.ip_address)
                 },
                 "dhcp": {
-                    "enabled": lan.get('dhcp_enabled', False),
-                    "dhcpRelay": {"enabled": False}
+                    "enabled": lan.dhcp_enabled,
                 }
             }
             
-            if lan.get('dhcp_enabled'):
-                interface["dhcp"]["poolStart"] = lan['dhcp_range_start']
-                interface["dhcp"]["poolEnd"] = lan['dhcp_range_end']
-                interface["dhcp"]["leaseTime"] = 86400
-                interface["dhcp"]["options"] = {
-                    "dns1": self.params.get('services', {}).get('dns_servers', ['8.8.8.8'])[0]
-                }
+            if lan.dhcp_enabled:
+                interface["dhcp"]["poolStart"] = str(lan.dhcp_range_start)
+                interface["dhcp"]["poolEnd"] = str(lan.dhcp_range_end)
             
             routed_interfaces.append(interface)
-        
-        lan_config = {"routedInterfaces": routed_interfaces}
-        config += f'''# POST /configuration/updateConfigurationModule (LAN)
-{json.dumps(lan_config, indent=2)}
-'''
-        
-        self.config_sections.append(config)
-        return config
-    
-    def apply_policies(self, policy_set: str) -> str:
-        policies = {
-            'basic': self._basic_policies(),
-            'standard': self._standard_policies(),
-            'advanced': self._advanced_policies()
-        }
-        config = policies.get(policy_set, policies['basic'])
-        self.config_sections.append(config)
-        return config
-    
-    def _basic_policies(self) -> str:
-        business_policy = {
-            "name": "Default-Allow",
-            "match": {
-                "appid": -1,
-                "dip": "any",
-                "dsm": "255.255.255.255",
-                "sip": "any",
-                "ssm": "255.255.255.255"
-            },
-            "action": {
-                "edge2CloudRouting": {
-                    "allowDirect": True,
-                    "routeType": "GATEWAY_VIA_EDGE"
-                },
-                "edge2DataCenterRouting": {
-                    "enabled": False
-                },
-                "QoS": {
-                    "type": "transactional",
-                    "class": "normal"
-                }
-            }
-        }
-        
-        return f'''\n# --- Business Policy (Basic) ---
-# POST /configuration/updateConfigurationModule (Business Policy)
-{json.dumps({"rules": [business_policy]}, indent=2)}
-'''
-    
-    def _standard_policies(self) -> str:
-        base = self._basic_policies()
-        
-        qos_rules = [
+        self.payloads["lan_interfaces"] = routed_interfaces
+
+    def apply_policies(self, policy_set: str):
+        self.payloads["business_policies"] = [
             {
-                "name": "VoIP-Priority",
-                "match": {"appid": 130},  # Voice/Video apps
+                "name": f"Default_{policy_set.capitalize()}",
                 "action": {
                     "QoS": {
-                        "type": "realtime",
-                        "class": "high"
-                    },
-                    "linkSteering": "LOAD_BALANCE"
-                }
-            },
-            {
-                "name": "Streaming-Throttle",
-                "match": {"appid": 50},  # Streaming
-                "action": {
-                    "QoS": {
-                        "type": "bulk",
-                        "class": "low"
+                        "type": "transactional" if policy_set == 'basic' else "realtime",
+                        "priority": "high" if policy_set == 'advanced' else "normal"
                     }
                 }
             }
         ]
-        
-        return base + f'''\n# --- QoS Rules (Standard) ---
-# POST /configuration/updateConfigurationModule (QoS)
-{json.dumps({"rules": qos_rules}, indent=2)}
-'''
-    
-    def _advanced_policies(self) -> str:
-        base = self._standard_policies()
-        
-        firewall = {
-            "inbound": [
-                {
-                    "name": "Block-All-Inbound",
-                    "match": {"sip": "any", "dip": "any"},
-                    "action": {"allow": False, "log": True}
-                }
-            ],
-            "stateful": True,
-            "logging": {"enabled": True}
-        }
-        
-        return base + f'''\n# --- Firewall Rules (Advanced) ---
-# POST /configuration/updateConfigurationModule (Firewall)
-{json.dumps(firewall, indent=2)}
-'''
 
-    def validate_custom_rules(self, params: dict) -> Tuple[bool, List[str], List[str]]:
-        """Validaciones específicas para Velocloud"""
+    def validate_custom_rules(self, params: NetworkParams) -> Tuple[bool, List[str], List[str]]:
         errors = []
         warnings = []
-        
-        # Regla: Al menos una interfaz LAN
-        lan_interfaces = params.get('lan_interfaces', [])
-        if not lan_interfaces:
+        if not params.lan_interfaces:
             errors.append("Velocloud requiere al menos una interfaz LAN configurada")
-            
         return len(errors) == 0, errors, warnings
+
+    def export_artifact(self) -> Any:
+        from output.artifact import ConfigArtifact
+        return ConfigArtifact(
+            vendor=self.VENDOR_NAME,
+            format=self.OUTPUT_FORMAT,
+            content={"velocloud_vco_config": self.payloads},
+            site_name=self.params.site_info.name if self.params else "Unknown"
+        )

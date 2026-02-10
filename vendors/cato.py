@@ -1,213 +1,93 @@
 from .base import VendorConfig
 import json
-from typing import List, Tuple
+from typing import List, Tuple, Any
+from schemas import NetworkParams, WanInterface, LanInterface
 
 class CatoConfig(VendorConfig):
     """Generador de configuración para CATO Networks"""
     
     VENDOR_NAME = "cato"
-    OUTPUT_FORMAT = "json"
+    OUTPUT_FORMAT = "graphql"
     SUPPORTED_MODELS = [
         "Socket X1500", "Socket X1600", "Socket X1700",
         "vSocket (AWS)", "vSocket (Azure)", "vSocket (GCP)"
     ]
+    SUPPORTED_FIRMWARES = [
+        "18.0", "19.0", "20.0"
+    ]
     
     def __init__(self):
         super().__init__()
-        self.api_mutations = []
+        self.mutations = []
     
-    def generate_base_config(self, params: dict) -> str:
+    def generate_base_config(self, params: NetworkParams):
         self.params = params
-        site = params.get('site_info', {})
-        device = params.get('device', {})
+        site = params.site_info
         
-        site_mutation = {
+        self.mutations.append({
             "mutation": "addSite",
-            "input": {
-                "name": site.get('name', 'New Site'),
-                "description": f"Customer: {site.get('customer', '')} | {site.get('location', '')}",
+            "variables": {
+                "name": site.name,
+                "description": f"Customer: {site.customer}",
                 "siteType": "BRANCH",
-                "connectionType": "SOCKET",
-                "countryCode": "US",  # Should be parameterized
-                "timezone": site.get('timezone', 'America/New_York'),
-                "siteLocation": {
-                    "address": site.get('location', '')
-                }
+                "timezone": site.timezone
             }
-        }
-        self.api_mutations.append(site_mutation)
-        
-        config = f'''# ============================================
-# CATO Networks Configuration
-# Site: {site.get('name', 'UNNAMED')}
-# Customer: {site.get('customer', 'UNNAMED')}
-# Model: {device.get('model', 'Socket')}
-# Firmware: {device.get('firmware_version', 'Unknown')}
-# ============================================
-# Note: CATO uses GraphQL API for configuration
-# Below are the mutations needed
-
-# --- Create Site ---
-# GraphQL Mutation: addSite
-{json.dumps(site_mutation, indent=2)}
-'''
-        self.config_sections.append(config)
-        return config
+        })
     
-    def apply_wan_config(self, wan_params: list) -> str:
-        config = "\n# --- Socket WAN Configuration ---\n"
-        
-        interfaces = []
+    def apply_wan_config(self, wan_params: List[WanInterface]):
         for idx, wan in enumerate(wan_params):
-            interface = {
+            self.mutations.append({
                 "mutation": "updateSocketInterface",
-                "input": {
+                "variables": {
                     "interfaceId": f"WAN{idx + 1}",
-                    "name": wan.get('isp_name', f'WAN-{idx + 1}'),
-                    "destType": "CATO",
                     "bandwidth": {
-                        "upstreamBandwidth": wan.get('bandwidth_mbps', 100),
-                        "downstreamBandwidth": wan.get('bandwidth_mbps', 100),
-                        "upstreamBandwidthPriority": 1 if wan.get('priority') == 'primary' else 2
+                        "upstream": wan.bandwidth_mbps or 100,
+                        "downstream": wan.bandwidth_mbps or 100
                     },
                     "staticConfiguration": {
-                        "ip": wan['ip_address'],
-                        "subnet": wan['subnet_mask'],
-                        "gateway": wan['gateway']
+                        "ip": str(wan.ip_address),
+                        "subnet": wan.subnet_mask,
+                        "gateway": str(wan.gateway)
                     }
                 }
-            }
-            interfaces.append(interface)
-            self.api_mutations.append(interface)
-        
-        config += f'''{json.dumps({"interfaces": interfaces}, indent=2)}
-'''
-        self.config_sections.append(config)
-        return config
-    
-    def apply_lan_config(self, lan_params: list) -> str:
-        config = "\n# --- Native Range (LAN) Configuration ---\n"
-        
-        native_ranges = []
-        for lan in lan_params:
-            cidr = self._cidr_from_mask(lan['subnet_mask'])
-            native_range = {
-                "mutation": "addNetworkRange",
-                "input": {
-                    "name": lan.get('vlan_name', 'LAN'),
-                    "rangeType": "Routed",
-                    "subnet": f"{self._network_address(lan['ip_address'], lan['subnet_mask'])}/{cidr}",
-                    "gateway": lan['ip_address'],
-                    "vlan": lan.get('vlan_id', 0),
-                    "dhcp": {
-                        "dhcpType": "DHCP_RANGE" if lan.get('dhcp_enabled') else "DHCP_DISABLED",
-                        "ipRange": f"{lan.get('dhcp_range_start', '')}-{lan.get('dhcp_range_end', '')}" if lan.get('dhcp_enabled') else None
-                    }
-                }
-            }
-            native_ranges.append(native_range)
-            self.api_mutations.append(native_range)
-        
-        config += f'''{json.dumps({"nativeRanges": native_ranges}, indent=2)}
-'''
-        self.config_sections.append(config)
-        return config
-    
-    def apply_policies(self, policy_set: str) -> str:
-        policies = {
-            'basic': self._basic_policies(),
-            'standard': self._standard_policies(),
-            'advanced': self._advanced_policies()
-        }
-        config = policies.get(policy_set, policies['basic'])
-        self.config_sections.append(config)
-        return config
-    
-    def _basic_policies(self) -> str:
-        wan_firewall = {
-            "mutation": "addWanFirewallRule",
-            "input": {
-                "name": "Allow-Outbound",
-                "enabled": True,
-                "source": {"subnet": "ANY"},
-                "destination": {"subnet": "ANY"},
-                "service": {"protocol": "ANY"},
-                "action": "ALLOW",
-                "tracking": {
-                    "event": {"enabled": True}
-                }
-            }
-        }
-        self.api_mutations.append(wan_firewall)
-        
-        return f'''\n# --- WAN Firewall (Basic) ---
-{json.dumps(wan_firewall, indent=2)}
-'''
-    
-    def _standard_policies(self) -> str:
-        base = self._basic_policies()
-        
-        internet_firewall = {
-            "mutation": "addInternetFirewallRule",
-            "input": {
-                "name": "Standard-Internet-Policy",
-                "enabled": True,
-                "source": {"subnet": "ANY"},
-                "service": {"protocol": "ANY"},
-                "action": "ALLOW",
-                "categories": {
-                    "blockedCategories": [
-                        "Adult Content", "Gambling", "Malware",
-                        "Phishing", "Botnets", "Spyware"
-                    ]
-                }
-            }
-        }
-        self.api_mutations.append(internet_firewall)
-        
-        return base + f'''\n# --- Internet Firewall (Standard) ---
-{json.dumps(internet_firewall, indent=2)}
-'''
-    
-    def _advanced_policies(self) -> str:
-        base = self._standard_policies()
-        
-        ips_policy = {
-            "mutation": "setSiteIPS",
-            "input": {
-                "enabled": True,
-                "mode": "PREVENT",
-                "advancedSettings": {
-                    "exploitProtection": True,
-                    "malwareProtection": True,
-                    "networkAttackProtection": True
-                }
-            }
-        }
-        self.api_mutations.append(ips_policy)
-        
-        return base + f'''\n# --- IPS Policy (Advanced) ---
-{json.dumps(ips_policy, indent=2)}
-'''
-    
-    def _cidr_from_mask(self, mask: str) -> int:
-        return sum([bin(int(x)).count('1') for x in mask.split('.')])
-    
-    def _network_address(self, ip: str, mask: str) -> str:
-        """Calcula la dirección de red"""
-        ip_parts = [int(x) for x in ip.split('.')]
-        mask_parts = [int(x) for x in mask.split('.')]
-        network = [ip_parts[i] & mask_parts[i] for i in range(4)]
-        return '.'.join(map(str, network))
+            })
 
-    def validate_custom_rules(self, params: dict) -> Tuple[bool, List[str], List[str]]:
-        """Validaciones específicas para CATO"""
+    def apply_lan_config(self, lan_params: List[LanInterface]):
+        for lan in lan_params:
+            self.mutations.append({
+                "mutation": "addNetworkRange",
+                "variables": {
+                    "name": f"LAN_{lan.vlan_id or 'BASE'}",
+                    "subnet": f"{self._network_address(str(lan.ip_address), lan.subnet_mask)}/{self._cidr_from_mask(lan.subnet_mask)}",
+                    "gateway": str(lan.ip_address),
+                    "vlan": lan.vlan_id or 0,
+                    "dhcp": {
+                        "enabled": lan.dhcp_enabled
+                    }
+                }
+            })
+
+    def apply_policies(self, policy_set: str):
+        self.mutations.append({
+            "mutation": "setPolicyAlpha",
+            "variables": {
+                "mode": policy_set,
+                "ips_enabled": policy_set == 'advanced'
+            }
+        })
+
+    def validate_custom_rules(self, params: NetworkParams) -> Tuple[bool, List[str], List[str]]:
         errors = []
         warnings = []
-        
-        # Regla: CATO requiere siteType y countryCode (aunque aquí siteType está fijo en BRANCH)
-        site = params.get('site_info', {})
-        if not site.get('location'):
+        if not params.site_info.location:
             warnings.append("CATO requiere una dirección física para el Site Location para mayor precisión en el portal")
-            
         return len(errors) == 0, errors, warnings
+
+    def export_artifact(self) -> Any:
+        from output.artifact import ConfigArtifact
+        return ConfigArtifact(
+            vendor=self.VENDOR_NAME,
+            format=self.OUTPUT_FORMAT,
+            content={"cato_graphql_mutations": self.mutations},
+            site_name=self.params.site_info.name if self.params else "Unknown"
+        )

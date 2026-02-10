@@ -1,10 +1,12 @@
-from typing import Dict, Optional
-from validators import ConfigValidator
+from typing import Dict, Optional, List, Tuple
+from schemas import NetworkParams
+from output.artifact import ConfigArtifact
 from vendors.fortinet import FortinetConfig
 from vendors.meraki import MerakiConfig
 from vendors.velocloud import VelocloudConfig
 from vendors.bigleaf import BigleafConfig
 from vendors.cato import CatoConfig
+from pydantic import ValidationError
 
 class NetworkConfigGenerator:
     """Motor principal para generación de configuraciones"""
@@ -18,33 +20,45 @@ class NetworkConfigGenerator:
     }
     
     def __init__(self):
-        self.validator = ConfigValidator()
+        # We don't need ConfigValidator anymore as Pydantic handles it
+        pass
     
-    def generate(self, params: dict) -> dict:
+    def validate_params(self, params_dict: dict) -> Tuple[bool, List[str], List[str]]:
+        """Valida parámetros usando Pydantic"""
+        try:
+            NetworkParams(**params_dict)
+            return True, [], []
+        except ValidationError as e:
+            errors = []
+            for error in e.errors():
+                loc = " -> ".join([str(x) for x in error['loc']])
+                errors.append(f"{loc}: {error['msg']}")
+            return False, errors, []
+        except Exception as e:
+            return False, [str(e)], []
+
+    def generate(self, params_dict: dict) -> dict:
         """
         Genera configuración completa para un dispositivo
-        
-        Args:
-            params: Diccionario con parámetros de configuración
-            
-        Returns:
-            dict con success, errors, warnings, config, vendor, site_name
         """
-        # Paso 1: Validar inputs
-        is_valid, errors, warnings = self.validator.validate_all(params)
-        
-        if not is_valid:
+        # Paso 1: Validar con Pydantic
+        try:
+            params = NetworkParams(**params_dict)
+        except ValidationError as e:
+            errors = []
+            for error in e.errors():
+                loc = " -> ".join([str(x) for x in error['loc']])
+                errors.append(f"{loc}: {error['msg']}")
             return {
                 'success': False,
                 'errors': errors,
-                'warnings': warnings,
+                'warnings': [],
                 'config': None,
-                'vendor': None,
-                'site_name': params.get('site_info', {}).get('name', 'Unknown')
+                'vendor': params_dict.get('device', {}).get('vendor'),
+                'site_name': params_dict.get('site_info', {}).get('name', 'Unknown')
             }
         
-        # Paso 2: Seleccionar vendor
-        vendor_name = params['device']['vendor'].lower()
+        vendor_name = params.device.vendor.lower()
         vendor_class = self.VENDOR_CLASSES.get(vendor_name)
         
         if not vendor_class:
@@ -54,17 +68,20 @@ class NetworkConfigGenerator:
                 'warnings': [],
                 'config': None,
                 'vendor': vendor_name,
-                'site_name': params.get('site_info', {}).get('name', 'Unknown')
+                'site_name': params.site_info.name
             }
         
         vendor_config = vendor_class()
+        vendor_config.params = params
         
-        # Paso 3: Validar modelo
-        model = params['device'].get('model', '')
-        if not vendor_config.validate_model(model):
-            warnings.append(f"Modelo '{model}' no está en la lista de modelos soportados para {vendor_name}")
+        errors = []
+        warnings = []
         
-        # Paso 3.5: Validaciones específicas del vendor
+        # Paso 2: Validar modelo
+        if not vendor_config.validate_model(params.device.model):
+            warnings.append(f"Modelo '{params.device.model}' no está en la lista de modelos soportados para {vendor_name}")
+        
+        # Paso 3: Validaciones específicas del vendor
         is_custom_valid, custom_errors, custom_warnings = vendor_config.validate_custom_rules(params)
         errors.extend(custom_errors)
         warnings.extend(custom_warnings)
@@ -76,27 +93,26 @@ class NetworkConfigGenerator:
                 'warnings': warnings,
                 'config': None,
                 'vendor': vendor_name,
-                'site_name': params.get('site_info', {}).get('name', 'Unknown')
+                'site_name': params.site_info.name
             }
         
         # Paso 4: Generar configuración
         try:
             vendor_config.generate_base_config(params)
-            vendor_config.apply_wan_config(params.get('wan_interfaces', []))
-            vendor_config.apply_lan_config(params.get('lan_interfaces', []))
-            vendor_config.apply_policies(params.get('policy_template', 'basic'))
+            vendor_config.apply_wan_config(params.wan_interfaces)
+            vendor_config.apply_lan_config(params.lan_interfaces)
+            vendor_config.apply_policies(params.policy_template)
             
-            config_output = vendor_config.export_config()
+            artifact = vendor_config.export_artifact()
             
-            return {
+            result = artifact.as_dict()
+            result.update({
                 'success': True,
                 'errors': [],
                 'warnings': warnings,
-                'config': config_output,
-                'vendor': vendor_name,
-                'site_name': params.get('site_info', {}).get('name', 'Unknown'),
-                'output_format': vendor_config.OUTPUT_FORMAT
-            }
+                'site_name': params.site_info.name
+            })
+            return result
             
         except Exception as e:
             return {
@@ -105,16 +121,18 @@ class NetworkConfigGenerator:
                 'warnings': warnings,
                 'config': None,
                 'vendor': vendor_name,
-                'site_name': params.get('site_info', {}).get('name', 'Unknown')
+                'site_name': params.site_info.name
             }
     
     def get_supported_vendors(self) -> list:
-        """Retorna lista de vendors soportados"""
         return list(self.VENDOR_CLASSES.keys())
     
-    def get_supported_models(self, vendor: str) -> list:
-        """Retorna lista de modelos soportados para un vendor"""
-        vendor_class = self.VENDOR_CLASSES.get(vendor.lower())
-        if vendor_class:
-            return vendor_class.SUPPORTED_MODELS
-        return []
+    def get_catalog(self) -> dict:
+        """Retorna el catálogo completo de vendors, modelos y firmwares"""
+        catalog = {}
+        for name, cls in self.VENDOR_CLASSES.items():
+            catalog[name] = {
+                'models': cls.SUPPORTED_MODELS,
+                'firmwares': cls.SUPPORTED_FIRMWARES
+            }
+        return catalog

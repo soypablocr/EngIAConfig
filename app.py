@@ -2,14 +2,32 @@ from flask import Flask, request, jsonify, render_template, send_file
 from config_generator import NetworkConfigGenerator
 import io
 import json
+import os
 
 app = Flask(__name__)
 generator = NetworkConfigGenerator()
+
+# Minimal Security
+API_KEY = os.environ.get("ENGIA_API_KEY")
+
+def require_api_key(f):
+    def decorated(*args, **kwargs):
+        if API_KEY:
+            if request.headers.get("X-API-Key") != API_KEY:
+                return jsonify({"error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    decorated.__name__ = f.__name__
+    return decorated
 
 @app.route('/')
 def index():
     """Página principal con formulario"""
     return render_template('index.html')
+
+@app.route('/api/catalog', methods=['GET'])
+def get_catalog():
+    """Retorna el catálogo completo de vendors, modelos y firmwares"""
+    return jsonify(generator.get_catalog())
 
 @app.route('/api/vendors', methods=['GET'])
 def get_vendors():
@@ -18,15 +36,8 @@ def get_vendors():
         'vendors': generator.get_supported_vendors()
     })
 
-@app.route('/api/models/<vendor>', methods=['GET'])
-def get_models(vendor):
-    """Lista de modelos para un vendor"""
-    models = generator.get_supported_models(vendor)
-    if models:
-        return jsonify({'vendor': vendor, 'models': models})
-    return jsonify({'error': f'Vendor {vendor} no encontrado'}), 404
-
 @app.route('/api/generate', methods=['POST'])
+@require_api_key
 def generate_config():
     """Genera configuración"""
     try:
@@ -41,40 +52,34 @@ def generate_config():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/download', methods=['POST'])
+@require_api_key
 def download_config():
     """Descarga configuración como archivo"""
     try:
         params = request.json
         result = generator.generate(params)
         
-        if not result['success']:
+        if not result.get('success'):
             return jsonify(result), 400
         
-        # Determinar extensión según vendor
-        extensions = {
-            'fortinet': '.conf',
-            'meraki': '.json',
-            'velocloud': '.json',
-            'bigleaf': '.json',
-            'cato': '.json'
-        }
-        vendor = result.get('vendor', 'generic')
-        ext = extensions.get(vendor.lower(), '.txt')
-        site_name = result.get('site_name', 'config').replace(' ', '_')
-        filename = f"{site_name}_{vendor}{ext}"
+        filename = result.get('filename', 'config.txt')
+        mimetype = result.get('mimetype', 'text/plain')
         
         # Crear archivo en memoria
+        content = result['content']
+        if result['format'] == 'json':
+            content = json.dumps(content, indent=2)
+        
         buffer = io.BytesIO()
-        buffer.write(result['config'].encode('utf-8'))
+        buffer.write(str(content).encode('utf-8'))
         buffer.seek(0)
         
         response = send_file(
             buffer,
             as_attachment=True,
             download_name=filename,
-            mimetype='text/plain'
+            mimetype=mimetype
         )
-        # Agregar header para que el frontend pueda leer el nombre sugerido si es necesario
         response.headers["Content-Disposition"] = f"attachment; filename={filename}"
         return response
         
@@ -82,6 +87,7 @@ def download_config():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/validate', methods=['POST'])
+@require_api_key
 def validate_params():
     """Valida parámetros sin generar config"""
     try:
@@ -89,9 +95,9 @@ def validate_params():
         if not params:
             return jsonify({'error': 'No se recibieron parámetros'}), 400
         
-        is_valid, errors, warnings = generator.validator.validate_all(params)
+        valid, errors, warnings = generator.validate_params(params)
         return jsonify({
-            'valid': is_valid,
+            'valid': valid,
             'errors': errors,
             'warnings': warnings
         })
@@ -100,6 +106,8 @@ def validate_params():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
+    # Limit max request size to 1MB
+    app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024
     app.run(debug=True, host='0.0.0.0', port=5005)
 
 

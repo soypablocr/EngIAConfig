@@ -1,5 +1,6 @@
 from .base import VendorConfig
 from typing import List, Tuple
+from schemas import NetworkParams, WanInterface, LanInterface
 
 class FortinetConfig(VendorConfig):
     """Generador de configuración para FortiGate"""
@@ -11,6 +12,9 @@ class FortinetConfig(VendorConfig):
         "FortiGate 80F", "FortiGate 100F", "FortiGate 200F",
         "FortiGate 400F", "FortiGate 600F"
     ]
+    SUPPORTED_FIRMWARES = [
+        "7.0.12", "7.2.5", "7.4.1"
+    ]
     
     TIMEZONE_CODES = {
         "America/Costa_Rica": "12",
@@ -21,35 +25,33 @@ class FortinetConfig(VendorConfig):
         "UTC": "80"
     }
     
-    def __init__(self):
-        super().__init__()
-    
-    def generate_base_config(self, params: dict) -> str:
+    def generate_base_config(self, params: NetworkParams):
         self.params = params
-        site = params.get('site_info', {})
-        services = params.get('services', {})
+        site = params.site_info
+        services = params.services
         
-        tz_code = self.TIMEZONE_CODES.get(site.get('timezone', 'UTC'), '80')
-        dns_primary = services.get('dns_servers', ['8.8.8.8'])[0]
-        dns_secondary = services.get('dns_servers', ['8.8.8.8', '8.8.4.4'])[1] if len(services.get('dns_servers', [])) > 1 else '8.8.4.4'
-        ntp_server = services.get('ntp_servers', ['pool.ntp.org'])[0]
+        tz_code = self.TIMEZONE_CODES.get(site.timezone, '80')
+        dns_servers = services.dns_servers if services.dns_servers else ["8.8.8.8", "8.8.4.4"]
+        dns_primary = dns_servers[0]
+        dns_secondary = dns_servers[1] if len(dns_servers) > 1 else "8.8.4.4"
+        ntp_server = services.ntp_servers[0] if services.ntp_servers else "pool.ntp.org"
         
         config = f'''# ============================================
 # FortiGate Configuration
-# Site: {site.get('name', 'UNNAMED')}
-# Customer: {site.get('customer', 'UNNAMED')}
-# Firmware: {params.get('device', {}).get('firmware_version', 'Unknown')}
+# Site: {site.name}
+# Customer: {site.customer}
+# Firmware: {params.device.firmware_version}
 # Generated automatically - Review before applying
-
 # ============================================
 
 # --- System Global Settings ---
 config system global
-    set hostname "{site.get('name', 'FortiGate')}"
+    set hostname "{site.name}"
     set timezone {tz_code}
     set admin-sport 8443
     set admin-ssh-port 22
     set admintimeout 30
+    set gui-theme mariner
 end
 
 # --- DNS Configuration ---
@@ -64,7 +66,7 @@ config system ntp
     set server-mode disable
     config ntpserver
         edit 1
-            set server {ntp_server}
+            set server "{ntp_server}"
         next
     end
 end
@@ -72,39 +74,38 @@ end
 # --- SNMP Configuration ---
 config system snmp sysinfo
     set status enable
-    set description "{site.get('customer', '')} - {site.get('name', '')}"
-    set location "{site.get('location', '')}"
+    set description "{site.customer} - {site.name}"
+    set location "{site.location}"
 end
 '''
         self.config_sections.append(config)
-        return config
-    
-    def apply_wan_config(self, wan_params: list) -> str:
+
+    def apply_wan_config(self, wan_params: List[WanInterface]):
         config = "\n# --- WAN Interface Configuration ---\n"
         
         for idx, wan in enumerate(wan_params):
-            iface = wan.get('interface_name', f'wan{idx + 1}')
-            priority = 10 if wan.get('priority') == 'primary' else 20
+            iface = wan.interface_name
+            priority = 10 if wan.priority == 'primary' else 20
             
             config += f'''
 config system interface
     edit "{iface}"
         set mode static
-        set ip {wan['ip_address']} {wan['subnet_mask']}
+        set ip {wan.ip_address} {wan.subnet_mask}
         set allowaccess ping https ssh snmp
-        set alias "{wan.get('isp_name', f'WAN-{idx + 1}')}"
+        set alias "{wan.isp_name or f'WAN-{idx + 1}'}"
         set role wan
-        set estimated-upstream-bandwidth {wan.get('bandwidth_mbps', 100) * 1000}
-        set estimated-downstream-bandwidth {wan.get('bandwidth_mbps', 100) * 1000}
+        set estimated-upstream-bandwidth {int(wan.bandwidth_mbps or 100) * 1000}
+        set estimated-downstream-bandwidth {int(wan.bandwidth_mbps or 100) * 1000}
     next
 end
 
 config router static
     edit {idx + 1}
-        set gateway {wan['gateway']}
+        set gateway {wan.gateway}
         set device "{iface}"
         set priority {priority}
-        set comment "{wan.get('isp_name', f'Route via WAN-{idx + 1}')}"
+        set comment "{wan.isp_name or f'Route via WAN-{idx + 1}'}"
     next
 end
 '''
@@ -114,16 +115,15 @@ end
             config += self._generate_sdwan_config(wan_params)
         
         self.config_sections.append(config)
-        return config
-    
-    def _generate_sdwan_config(self, wan_params: list) -> str:
+
+    def _generate_sdwan_config(self, wan_params: List[WanInterface]) -> str:
         members = ""
         for idx, wan in enumerate(wan_params):
-            iface = wan.get('interface_name', f'wan{idx + 1}')
+            iface = wan.interface_name
             members += f'''
         edit {idx + 1}
             set interface "{iface}"
-            set gateway {wan['gateway']}
+            set gateway {wan.gateway}
         next
 '''
         
@@ -149,37 +149,37 @@ config system sdwan
     end
 end
 '''
-    
-    def apply_lan_config(self, lan_params: list) -> str:
+
+    def apply_lan_config(self, lan_params: List[LanInterface]):
         config = "\n# --- LAN Interface Configuration ---\n"
         dhcp_id = 1
         
         for lan in lan_params:
-            iface = lan.get('interface_name', 'lan')
-            vlan_id = lan.get('vlan_id')
+            iface = lan.interface_name
+            vlan_id = lan.vlan_id
             
             if vlan_id and vlan_id > 1:
-                # Configurar como VLAN interface
+                vlan_name = f"VLAN{vlan_id}"
                 config += f'''
 config system interface
-    edit "{lan.get('vlan_name', f'VLAN{vlan_id}')}"
+    edit "{vlan_name}"
         set vdom "root"
         set vlanid {vlan_id}
-        set interface "lan"
-        set ip {lan['ip_address']} {lan['subnet_mask']}
+        set interface "{lan.interface_name}"
+        set ip {lan.ip_address} {lan.subnet_mask}
         set allowaccess ping https ssh
         set role lan
         set device-identification enable
     next
 end
 '''
-                iface = lan.get('vlan_name', f'VLAN{vlan_id}')
+                iface = vlan_name
             else:
                 config += f'''
 config system interface
     edit "{iface}"
         set mode static
-        set ip {lan['ip_address']} {lan['subnet_mask']}
+        set ip {lan.ip_address} {lan.subnet_mask}
         set allowaccess ping https ssh
         set role lan
         set device-identification enable
@@ -188,21 +188,22 @@ end
 '''
             
             # DHCP Server
-            if lan.get('dhcp_enabled'):
-                dns_servers = self.params.get('services', {}).get('dns_servers', ['8.8.8.8', '8.8.4.4'])
-                dns1 = dns_servers[0] if dns_servers else '8.8.8.8'
+            if lan.dhcp_enabled:
+                dns_servers = self.params.services.dns_servers if self.params.services else ["8.8.8.8", "8.8.4.4"]
+                dns1 = dns_servers[0]
                 
                 config += f'''
 config system dhcp server
     edit {dhcp_id}
         set interface "{iface}"
-        set default-gateway {lan.get('ip_address', '192.168.1.1')}
+        set default-gateway {lan.ip_address}
+        set netmask {lan.subnet_mask}
         set dns-server1 {dns1}
         set lease-time 86400
         config ip-range
             edit 1
-                set start-ip {lan.get('dhcp_range_start', '')}
-                set end-ip {lan.get('dhcp_range_end', '')}
+                set start-ip {lan.dhcp_range_start}
+                set end-ip {lan.dhcp_range_end}
             next
         end
     next
@@ -211,9 +212,8 @@ end
                 dhcp_id += 1
         
         self.config_sections.append(config)
-        return config
-    
-    def apply_policies(self, policy_set: str) -> str:
+
+    def apply_policies(self, policy_set: str):
         policies = {
             'basic': self._basic_policies(),
             'standard': self._standard_policies(),
@@ -221,8 +221,7 @@ end
         }
         config = policies.get(policy_set, policies['basic'])
         self.config_sections.append(config)
-        return config
-    
+
     def _basic_policies(self) -> str:
         return '''
 # --- Basic Firewall Policies ---
@@ -247,8 +246,8 @@ end
 config firewall policy
     edit 1
         set name "LAN-to-WAN-Allow"
-        set srcintf "lan"
-        set dstintf "virtual-wan-link"
+        set srcintf "any"
+        set dstintf "any"
         set srcaddr "all"
         set dstaddr "all"
         set action accept
@@ -257,174 +256,51 @@ config firewall policy
         set nat enable
         set logtraffic all
     next
-    edit 100
-        set name "Deny-All"
-        set srcintf "any"
-        set dstintf "any"
-        set srcaddr "all"
-        set dstaddr "all"
-        set action deny
-        set schedule "always"
-        set service "ALL"
-        set logtraffic all
-    next
 end
 '''
-    
+
     def _standard_policies(self) -> str:
         return self._basic_policies() + '''
-# --- Web Filter Profile ---
+# --- Standard Security Profiles ---
 config webfilter profile
     edit "standard-webfilter"
         set comment "Standard web filtering profile"
         config ftgd-wf
-            set options error-allow
             config filters
                 edit 1
-                    set category 2
-                    set action block
-                next
-                edit 2
-                    set category 7
-                    set action block
-                next
-                edit 3
-                    set category 8
-                    set action block
-                next
-                edit 4
-                    set category 9
-                    set action block
-                next
-                edit 5
-                    set category 11
-                    set action block
-                next
-                edit 6
-                    set category 14
-                    set action block
-                next
-                edit 7
-                    set category 15
-                    set action block
-                next
-                edit 8
-                    set category 16
-                    set action block
-                next
-                edit 9
-                    set category 57
-                    set action block
-                next
-                edit 10
-                    set category 63
-                    set action block
-                next
-                edit 11
-                    set category 64
-                    set action block
-                next
-                edit 12
-                    set category 65
-                    set action block
-                next
-                edit 13
-                    set category 66
-                    set action block
-                next
-                edit 14
-                    set category 67
+                    set category 2 7 8 9 11 14 15 16 57 63 64 65 66 67
                     set action block
                 next
             end
         end
     next
 end
-
-# --- Application Control ---
-config application list
-    edit "standard-app-control"
-        set comment "Standard application control"
-        config entries
-            edit 1
-                set category 2
-                set action block
-            next
-            edit 2
-                set category 6
-                set action block
-            next
-        end
-    next
-end
 '''
-    
+
     def _advanced_policies(self) -> str:
         return self._standard_policies() + '''
-# --- IPS Sensor ---
+# --- Advanced Security Profiles ---
 config ips sensor
     edit "standard-ips"
-        set comment "Standard IPS sensor"
         config entries
             edit 1
                 set severity high critical
                 set action block
                 set status enable
             next
-            edit 2
-                set severity medium
-                set action pass
-                set log enable
-                set status enable
-            next
-        end
-    next
-end
-
-# --- Antivirus Profile ---
-config antivirus profile
-    edit "standard-av"
-        set comment "Standard antivirus profile"
-        config http
-            set av-scan enable
-        end
-        config ftp
-            set av-scan enable
-        end
-        config smtp
-            set av-scan enable
-        end
-        config pop3
-            set av-scan enable
-        end
-    next
-end
-
-# --- SSL Inspection ---
-config firewall ssl-ssh-profile
-    edit "certificate-inspection"
-        set comment "Certificate inspection only"
-        config https
-            set ports 443
-            set status certificate-inspection
         end
     next
 end
 '''
 
-    def validate_custom_rules(self, params: dict) -> Tuple[bool, List[str], List[str]]:
-        """Validaciones específicas para Fortinet"""
+    def validate_custom_rules(self, params: NetworkParams) -> Tuple[bool, List[str], List[str]]:
         errors = []
         warnings = []
         
-        # Regla: Máximo 4 interfaces WAN
-        wan_interfaces = params.get('wan_interfaces', [])
-        if len(wan_interfaces) > 4:
-            errors.append(f"Fortinet soporta un máximo de 4 interfaces WAN en este motor (se recibieron {len(wan_interfaces)})")
+        if len(params.wan_interfaces) > 4:
+            errors.append(f"Fortinet soporta un máximo de 4 interfaces WAN (se recibieron {len(params.wan_interfaces)})")
         
-        # Regla: Verificar si el modelo es 40F (solo tiene 1 WAN física dedicada por lo general, aunque aquí es lógico)
-        model = params.get('device', {}).get('model', '')
-        if "40F" in model and len(wan_interfaces) > 2:
-            warnings.append(f"El modelo {model} típicamente tiene recursos limitados para más de 2 WANs")
+        if "40F" in params.device.model and len(params.wan_interfaces) > 2:
+            warnings.append(f"El modelo {params.device.model} típicamente tiene recursos limitados para más de 2 WANs")
             
         return len(errors) == 0, errors, warnings
