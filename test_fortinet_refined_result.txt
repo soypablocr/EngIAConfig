@@ -1,0 +1,244 @@
+# ============================================
+# FortiGate Configuration
+# Site: ADVANCED-SITE
+# Customer: Advanced Corp
+# Firmware: 7.4.1
+# Generated automatically - Review before applying
+# ============================================
+
+# --- System Global Settings ---
+config system global
+    set hostname "ADVANCED-SITE"
+    set timezone 12
+    set admin-sport 8443
+    set admin-ssh-port 22
+    set admintimeout 30
+    set gui-theme mariner
+end
+
+# --- DNS Configuration ---
+config system dns
+    set primary 8.8.8.8
+    set secondary 8.8.4.4
+end
+
+# --- NTP Configuration ---
+config system ntp
+    set ntpsync enable
+    set server-mode disable
+    config ntpserver
+        edit 1
+            set server "pool.ntp.org"
+        next
+    end
+end
+
+# --- SNMP Configuration ---
+config system snmp sysinfo
+    set status enable
+    set description "Advanced Corp - ADVANCED-SITE"
+    set location "Costa Rica"
+end
+
+
+# --- WAN Interface Configuration ---
+
+config system interface
+    edit "wan1"
+        set mode static
+        set ip 1.1.1.1 255.255.255.0
+        set allowaccess ping https ssh snmp
+        set alias "ISP1"
+        set role wan
+        set estimated-upstream-bandwidth 100000
+        set estimated-downstream-bandwidth 100000
+    next
+end
+
+config router static
+    edit 1
+        set gateway 1.1.1.254
+        set device "wan1"
+        set priority 10
+        set comment "ISP1"
+    next
+end
+
+config system interface
+    edit "wan2"
+        set mode static
+        set ip 2.2.2.2 255.255.255.0
+        set allowaccess ping https ssh snmp
+        set alias "ISP2"
+        set role wan
+        set estimated-upstream-bandwidth 50000
+        set estimated-downstream-bandwidth 50000
+    next
+end
+
+config router static
+    edit 2
+        set gateway 2.2.2.254
+        set device "wan2"
+        set priority 20
+        set comment "ISP2"
+    next
+end
+
+# --- SD-WAN Configuration ---
+config system sdwan
+    set status enable
+    config zone
+        edit "virtual-wan-link"
+        next
+    end
+    config members
+
+        edit 1
+            set interface "wan1"
+            set gateway 1.1.1.254
+        next
+
+        edit 2
+            set interface "wan2"
+            set gateway 2.2.2.254
+        next
+    end
+    config health-check
+
+        edit "Google-DNS"
+            set server "8.8.8.8"
+            set protocol dns
+            set interval 1000
+            set failtime 5
+            set recoverytime 5
+            set members 0
+        next
+    end
+end
+
+
+# --- LAN Interface Configuration ---
+
+config system interface
+    edit "lan"
+        set mode static
+        set ip 192.168.1.1 255.255.255.0
+        set allowaccess ping https ssh
+        set role lan
+        set device-identification enable
+    next
+end
+
+config system dhcp server
+    edit 1
+        set interface "lan"
+        set default-gateway 192.168.1.1
+        set netmask 255.255.255.0
+        set dns-server1 8.8.8.8
+        set lease-time 86400
+        config ip-range
+            edit 1
+                set start-ip 192.168.1.100
+                set end-ip 192.168.1.200
+            next
+        end
+    next
+end
+
+
+# --- Whitelist / Address Objects ---
+config firewall address
+    edit "WEB-SERVER-1"
+        set subnet 10.0.0.50 255.255.255.255
+    next
+    edit "OFFICE-NETWORK"
+        set subnet 172.16.0.0 255.255.255.0
+    next
+    edit "GOOGLE-AUTH"
+        set type fqdn
+        set fqdn "accounts.google.com"
+    next
+end
+
+
+# --- Basic Firewall Policies ---
+config firewall address
+    edit "RFC1918_10"
+        set subnet 10.0.0.0 255.0.0.0
+    next
+    edit "RFC1918_172"
+        set subnet 172.16.0.0 255.240.0.0
+    next
+    edit "RFC1918_192"
+        set subnet 192.168.0.0 255.255.0.0
+    next
+end
+
+config firewall addrgrp
+    edit "RFC1918_ALL"
+        set member "RFC1918_10" "RFC1918_172" "RFC1918_192"
+    next
+end
+
+config firewall policy
+    edit 1
+        set name "LAN-to-WAN-Allow"
+        set srcintf "any"
+        set dstintf "any"
+        set srcaddr "all"
+        set dstaddr "all"
+        set action accept
+        set schedule "always"
+        set service "ALL"
+        set nat enable
+        set logtraffic all
+    next
+end
+
+# --- Standard Security Profiles ---
+config webfilter profile
+    edit "standard-webfilter"
+        set comment "Standard web filtering profile"
+        config ftgd-wf
+            config filters
+                edit 1
+                    set category 2 7 8 9 11 14 15 16 57 63 64 65 66 67
+                    set action block
+                next
+            end
+        end
+    next
+end
+
+# --- Dynamic Web Filtering Profile ---
+config webfilter profile
+    edit "standard-webfilter"
+        set comment "Customized dynamic web filtering"
+        config ftgd-wf
+            config filters
+                edit 1
+                    set category 2 3 57
+                    set action block
+                next
+            end
+        end
+    next
+end
+
+
+# --- User Defined Custom Policies ---
+config firewall policy
+    edit 1000
+        set name "Permit-Admin-Access"
+        set srcintf "lan"
+        set dstintf "wan1"
+        set srcaddr "OFFICE-NETWORK" "WEB-SERVER-1"
+        set dstaddr "all"
+        set action accept
+        set schedule "always"
+        set service "ALL"
+        set nat enable
+        set logtraffic all
+    next
+end

@@ -110,13 +110,13 @@ config router static
 end
 '''
         
-        # SD-WAN si hay múltiples WANs
-        if len(wan_params) > 1:
-            config += self._generate_sdwan_config(wan_params)
+        # SD-WAN si hay múltiples WANs o si se definieron health checks
+        if len(wan_params) > 1 or getattr(self.params, 'sdwan_health_checks', []):
+            config += self._generate_enhanced_sdwan_config(wan_params)
         
         self.config_sections.append(config)
 
-    def _generate_sdwan_config(self, wan_params: List[WanInterface]) -> str:
+    def _generate_enhanced_sdwan_config(self, wan_params: List[WanInterface]) -> str:
         members = ""
         for idx, wan in enumerate(wan_params):
             iface = wan.interface_name
@@ -127,6 +127,33 @@ end
         next
 '''
         
+        health_checks = ""
+        hc_params = getattr(self.params, 'sdwan_health_checks', [])
+        if not hc_params:
+            # Default health check
+            health_checks = '''
+        edit "Default_DNS"
+            set server "8.8.8.8"
+            set protocol dns
+            set interval 1000
+            set failtime 5
+            set recoverytime 5
+            set members 0
+        next
+'''
+        else:
+            for hc in hc_params:
+                health_checks += f'''
+        edit "{hc.name}"
+            set server "{hc.server}"
+            set protocol {hc.protocol}
+            set interval {hc.interval}
+            set failtime {hc.failtime}
+            set recoverytime {hc.recoverytime}
+            set members 0
+        next
+'''
+
         return f'''
 # --- SD-WAN Configuration ---
 config system sdwan
@@ -138,15 +165,7 @@ config system sdwan
     config members
 {members}    end
     config health-check
-        edit "Default_DNS"
-            set server "8.8.8.8"
-            set protocol dns
-            set interval 1000
-            set failtime 5
-            set recoverytime 5
-            set members 0
-        next
-    end
+{health_checks}    end
 end
 '''
 
@@ -189,8 +208,8 @@ end
             
             # DHCP Server
             if lan.dhcp_enabled:
-                dns_servers = self.params.services.dns_servers if self.params.services else ["8.8.8.8", "8.8.4.4"]
-                dns1 = dns_servers[0]
+                dns_list = getattr(self.params.services, 'dns_servers', []) if self.params.services else []
+                dns1 = dns_list[0] if dns_list else "8.8.8.8"
                 
                 config += f'''
 config system dhcp server
@@ -214,13 +233,104 @@ end
         self.config_sections.append(config)
 
     def apply_policies(self, policy_set: str):
-        policies = {
+        # 1. Whitelist (Address Objects)
+        whitelist_config = ""
+        whitelist_items = getattr(self.params, 'whitelist', [])
+        if whitelist_items:
+            whitelist_config = "\n# --- Whitelist / Address Objects ---\nconfig firewall address\n"
+            for item in whitelist_items:
+                # Basic detection for FQDN vs Subnet
+                if any(char.isalpha() for char in item.address) and not " " in item.address:
+                    whitelist_config += f'''    edit "{item.name}"
+        set type fqdn
+        set fqdn "{item.address}"
+    next
+'''
+                else:
+                    addr = item.address
+                    if "/" in addr:
+                        # Convert CIDR
+                        import ipaddress
+                        net = ipaddress.IPv4Network(addr, strict=False)
+                        addr = f"{net.network_address} {net.netmask}"
+                    elif " " not in addr:
+                        # Assume host /32
+                        addr = f"{addr} 255.255.255.255"
+                    
+                    whitelist_config += f'''    edit "{item.name}"
+        set subnet {addr}
+    next
+'''
+            whitelist_config += "end\n"
+            self.config_sections.append(whitelist_config)
+
+        # 2. Template Policies (including dynamic webfilter if needed)
+        base_configs = {
             'basic': self._basic_policies(),
             'standard': self._standard_policies(),
-            'advanced': self._advanced_policies()
+            'advanced': self._advanced_policies(),
+            'custom': ""
         }
-        config = policies.get(policy_set, policies['basic'])
+        
+        config = base_configs.get(policy_set, base_configs['basic'])
+        
+        # Override webfilter if custom categories are provided
+        wf_categories = getattr(self.params, 'webfilter_categories', [])
+        if wf_categories and policy_set in ['standard', 'advanced']:
+            # Replace the static profile if it exists in the template or just append a new one
+            wf_config = self._generate_dynamic_webfilter(wf_categories)
+            config += wf_config
+            
         self.config_sections.append(config)
+
+        # 3. Custom Custom Policies
+        custom_policies = getattr(self.params, 'custom_policies', [])
+        if custom_policies:
+            custom_config = "\n# --- User Defined Custom Policies ---\nconfig firewall policy\n"
+            policy_id = 1000 
+            for p in custom_policies:
+                # Handle lists for source/destination addresses
+                srcaddr = p.srcaddr if isinstance(p.srcaddr, list) else [p.srcaddr]
+                dstaddr = p.dstaddr if isinstance(p.dstaddr, list) else [p.dstaddr]
+                
+                src_str = " ".join([f'"{s}"' for s in srcaddr])
+                dst_str = " ".join([f'"{d}"' for d in dstaddr])
+
+                custom_config += f'''    edit {policy_id}
+        set name "{p.name}"
+        set srcintf "{p.srcintf}"
+        set dstintf "{p.dstintf}"
+        set srcaddr {src_str}
+        set dstaddr {dst_str}
+        set action {p.action}
+        set schedule "always"
+        set service "{p.service}"
+        set nat {"enable" if p.nat else "disable"}
+        set logtraffic all
+    next
+'''
+                policy_id += 1
+            custom_config += "end\n"
+            self.config_sections.append(custom_config)
+
+    def _generate_dynamic_webfilter(self, categories: List[int]) -> str:
+        cat_str = " ".join(map(str, categories))
+        return f'''
+# --- Dynamic Web Filtering Profile ---
+config webfilter profile
+    edit "standard-webfilter"
+        set comment "Customized dynamic web filtering"
+        config ftgd-wf
+            config filters
+                edit 1
+                    set category {cat_str}
+                    set action block
+                next
+            end
+        end
+    next
+end
+'''
 
     def _basic_policies(self) -> str:
         return '''

@@ -5,231 +5,329 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Network Config Generator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #2563eb;
-            --primary-dark: #1d4ed8;
-            --success: #16a34a;
-            --error: #dc2626;
-            --warning: #ca8a04;
-            --bg: #f8fafc;
-            --card: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text-light: #64748b;
+            --primary: #c5a059;
+            /* Gold */
+            --primary-dark: #a68546;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --accent-gradient: linear-gradient(135deg, #c5a059 0%, #a68546 100%);
+            --bg-gradient: radial-gradient(circle at top right, #1e293b, #0f172a);
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+            font-family: 'Outfit', sans-serif;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text);
+            background: var(--bg-dark);
+            background-image: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
             line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://www.transparenttextures.com/patterns/carbon-fibre.png');
+            opacity: 0.05;
+            pointer-events: none;
+            z-index: 0;
         }
 
         .container {
-            max-width: 1200px;
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 2rem;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         header {
             text-align: center;
-            margin-bottom: 2rem;
+            margin-bottom: 3rem;
+            padding: 2rem;
         }
 
         header h1 {
-            font-size: 2rem;
-            color: var(--primary);
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+            margin-bottom: 0.5rem;
         }
 
         header p {
-            color: var(--text-light);
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
         }
 
         .grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1.4fr 1fr;
             gap: 2rem;
         }
 
-        @media (max-width: 900px) {
+        @media (max-width: 1100px) {
             .grid {
                 grid-template-columns: 1fr;
             }
         }
 
         .card {
-            background: var(--card);
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            margin-bottom: 1.5rem;
         }
 
-        .card h2 {
-            font-size: 1.1rem;
-            margin-bottom: 1rem;
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.6);
+            border-color: rgba(197, 160, 89, 0.3);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: var(--primary);
+            border-bottom: 1px solid var(--glass-border);
             padding-bottom: 0.5rem;
-            border-bottom: 1px solid var(--border);
         }
 
         .form-group {
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
         }
 
         label {
             display: block;
-            font-weight: 500;
-            margin-bottom: 0.25rem;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         input,
-        select {
+        select,
+        textarea {
             width: 100%;
-            padding: 0.5rem 0.75rem;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 0.9rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 0.8rem 1rem;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            outline: none;
         }
 
         input:focus,
         select:focus {
-            outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+            background: rgba(15, 23, 42, 0.8);
+            box-shadow: 0 0 0 4px rgba(197, 160, 89, 0.1);
         }
 
         .row {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-
-        .interface-section {
-            background: var(--bg);
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-        }
-
-        .interface-section h3 {
-            font-size: 0.9rem;
-            color: var(--text-light);
-            margin-bottom: 0.75rem;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
         }
 
         .btn {
-            padding: 0.75rem 1.5rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 0.8rem 2rem;
+            border-radius: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             border: none;
-            border-radius: 6px;
-            font-weight: 500;
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: var(--accent-gradient);
+            color: #000;
+            box-shadow: 0 10px 20px -5px rgba(197, 160, 89, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.02);
+            box-shadow: 0 15px 25px -5px rgba(197, 160, 89, 0.5);
+        }
+
+        .btn-success {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-success:hover {
+            background: rgba(16, 185, 129, 0.3);
+        }
+
+        .add-interface-btn {
+            background: rgba(197, 160, 89, 0.1);
+            color: var(--primary);
+            border: 1px dashed var(--primary);
+            padding: 0.5rem 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .add-interface-btn:hover {
+            background: rgba(197, 160, 89, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .remove-btn {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
             transition: all 0.2s;
         }
 
-        .btn-primary {
-            background: var(--primary);
+        .remove-btn:hover {
+            background: var(--error);
             color: white;
         }
 
-        .btn-primary:hover {
-            background: var(--primary-dark);
-        }
-
-        .btn-success {
-            background: var(--success);
-            color: white;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 1.5rem;
-        }
-
-        #output {
-            font-family: 'Monaco', 'Menlo', monospace;
-            font-size: 0.8rem;
-            background: #1e293b;
-            color: #e2e8f0;
+        .dynamic-row,
+        .dynamic-row-policy {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
             padding: 1rem;
-            border-radius: 8px;
-            white-space: pre-wrap;
+            margin-bottom: 1rem;
+            display: grid;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .dynamic-row {
+            grid-template-columns: 1fr 1fr auto;
+        }
+
+        .dynamic-row-policy {
+            grid-template-columns: 1.2fr 1fr 1fr 1fr 1fr 0.8fr auto;
+        }
+
+        pre#output {
+            background: #020617;
+            padding: 1.5rem;
+            border-radius: 16px;
+            color: #10b981;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.85rem;
             overflow-x: auto;
-            max-height: 600px;
-            overflow-y: auto;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            max-height: 800px;
         }
 
         .alert {
-            padding: 0.75rem 1rem;
-            border-radius: 6px;
-            margin-bottom: 1rem;
-        }
-
-        .alert-error {
-            background: #fef2f2;
-            color: var(--error);
-            border: 1px solid #fecaca;
-        }
-
-        .alert-warning {
-            background: #fefce8;
-            color: var(--warning);
-            border: 1px solid #fef08a;
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            animation: slideIn 0.3s ease-out;
         }
 
         .alert-success {
-            background: #f0fdf4;
-            color: var(--success);
-            border: 1px solid #bbf7d0;
+            background: rgba(16, 185, 129, 0.9);
+            color: white;
         }
 
-        .checkbox-group {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+        .alert-error {
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
         }
 
-        .checkbox-group input {
-            width: auto;
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
 
         .hidden {
             display: none;
         }
+    </style>
 
-        .add-interface-btn {
-            background-color: var(--secondary-color);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin: 1rem 0;
-            transition: background-color 0.2s;
-        }
-
-        .add-interface-btn:hover {
-            background-color: #2980b9;
-        }
     </style>
 </head>
 
 <body>
     <div class="container">
         <header>
-            <h1>🔧 Network Config Generator</h1>
-            <p>Generador de configuraciones multi-vendor</p>
+            <h1>ENGIA CONFIG</h1>
+            <p>Premium Network Provisioning System</p>
         </header>
 
         <div id="alerts"></div>
@@ -297,12 +395,30 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Política de Seguridad</label>
-                            <select id="policy_template">
-                                <option value="basic">Básica - Solo NAT y acceso saliente</option>
-                                <option value="standard" selected>Estándar - Web filter, App control</option>
-                                <option value="advanced">Avanzada - IPS, Antivirus, SSL</option>
+                            <label>Plantilla de Seguridad</label>
+                            <select id="policy_template" onchange="toggleWebfilterCard()">
+                                <option value="basic">Basic (Solo NAT/Allow)</option>
+                                <option value="standard">Standard (Webfilter Base)</option>
+                                <option value="advanced">Advanced (IPS + Webfilter)</option>
+                                <option value="custom">Custom (Solo Reglas Propias)</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- Webfilter Categories (Conditional) -->
+                    <div id="webfilter_card" class="card" style="margin-top: 1rem; display: none;">
+                        <h2>🌐 Categorías de Web Filtering</h2>
+                        <p style="font-size: 0.8rem; color: #666; margin-bottom: 1rem;">Selecciona las categorías que
+                            deseas BLOQUEAR (FortiGuard):</p>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                            <label><input type="checkbox" class="wf-cat" value="2"> Pornografía</label>
+                            <label><input type="checkbox" class="wf-cat" value="3"> Juegos de azar</label>
+                            <label><input type="checkbox" class="wf-cat" value="57"> Redes Sociales</label>
+                            <label><input type="checkbox" class="wf-cat" value="15"> Streaming Media</label>
+                            <label><input type="checkbox" class="wf-cat" value="8"> Juegos Online</label>
+                            <label><input type="checkbox" class="wf-cat" value="12"> Hacking/Malware</label>
+                            <label><input type="checkbox" class="wf-cat" value="7"> Abuso de drogas</label>
+                            <label><input type="checkbox" class="wf-cat" value="63"> Proxies/Anonymizers</label>
                         </div>
                     </div>
                     <div class="row">
@@ -579,20 +695,75 @@
                     </div>
                 </div>
 
+                <!-- Whitelist -->
+                <div class="card" style="margin-top: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>📝 Whitelist / Direcciones</h2>
+                        <button type="button" class="add-interface-btn" onclick="addDynamicRow('whitelist_container')">
+                            <span>+</span> Agregar
+                        </button>
+                    </div>
+                    <div id="whitelist_container">
+                        <!-- Rows added here -->
+                    </div>
+                </div>
+
+                <!-- Custom Policies -->
+                <div class="card" style="margin-top: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>🛡️ Políticas Personalizadas</h2>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button type="button" class="btn btn-success"
+                                style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="updatePolicySelectors()">
+                                🔄 Sincronizar Interfaces
+                            </button>
+                            <button type="button" class="add-interface-btn" onclick="addPolicyRow()">
+                                <span>+</span> Agregar Regla
+                            </button>
+                        </div>
+                    </div>
+                    <div id="policies_container" style="overflow-x: auto;">
+                        <!-- Policy headers -->
+                        <div class="dynamic-row-policy"
+                            style="font-size: 0.7rem; font-weight: bold; margin-bottom: 5px;">
+                            <div>Nombre</div>
+                            <div>Origen (Interface)</div>
+                            <div>Destino (Interface)</div>
+                            <div>Src Addr</div>
+                            <div>Dst Addr</div>
+                            <div>Acción</div>
+                            <div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SD-WAN Health Checks -->
+                <div class="card" style="margin-top: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2>💓 SD-WAN Health Checks</h2>
+                        <button type="button" class="add-interface-btn" onclick="addHealthCheckRow()">
+                            <span>+</span> Agregar
+                        </button>
+                    </div>
+                    <div id="health_checks_container">
+                        <!-- Rows added here -->
+                    </div>
+                </div>
+
                 <div class="btn-group">
                     <button class="btn btn-primary" onclick="generateConfig()">🚀 Generar Configuración</button>
                     <button class="btn btn-success" onclick="downloadConfig()">📥 Descargar</button>
                 </div>
             </div>
 
-            <!-- Output -->
-            <div>
-                <div class="card" style="height: 100%;">
-                    <h2>📄 Configuración Generada</h2>
-                    <pre id="output">La configuración aparecerá aquí...</pre>
-                </div>
-            </div>
         </div>
+    </div>
+
+    <footer
+        style="margin-top: 4rem; text-align: center; padding: 2rem; border-top: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.9rem;">
+        <p>&copy; 2026 ENGIA Config. Precision Engineering for Network Security.</p>
+        <p style="margin-top: 0.5rem; opacity: 0.5;">Powered by Advanced Agentic Intelligence</p>
+    </footer>
     </div>
 
     <script>
@@ -668,8 +839,17 @@
                     ].filter(Boolean),
                     ntp_servers: [document.getElementById('ntp').value].filter(Boolean)
                 },
-                policy_template: document.getElementById('policy_template').value
+                policy_template: document.getElementById('policy_template').value,
+                whitelist: [],
+                custom_policies: [],
+                sdwan_health_checks: [],
+                webfilter_categories: []
             };
+
+            // Webfilter categories
+            document.querySelectorAll('.wf-cat:checked').forEach(cb => {
+                data.webfilter_categories.push(parseInt(cb.value));
+            });
 
             // WAN Interfaces (1-4)
             for (let i = 1; i <= 4; i++) {
@@ -702,13 +882,166 @@
                         vlan_id: parseInt(document.getElementById(`lan${i}_vlan`).value) || null,
                         vlan_name: document.getElementById(`lan${i}_vlan_name`).value || (i === 1 ? 'LAN' : `VLAN${i}`),
                         dhcp_enabled: dhcpEnabledCheck ? dhcpEnabledCheck.checked : false,
-                        dhcp_range_start: dhcpStartInput ? dhcpStartInput.value : null,
-                        dhcp_range_end: dhcpEndInput ? dhcpEndInput.value : null
+                        dhcp_range_start: (dhcpStartInput && dhcpStartInput.value) ? dhcpStartInput.value : null,
+                        dhcp_range_end: (dhcpEndInput && dhcpEndInput.value) ? dhcpEndInput.value : null
                     });
                 }
             }
 
+            // Whitelist
+            document.querySelectorAll('#whitelist_container .dynamic-row').forEach(row => {
+                const name = row.querySelector('.wl-name').value;
+                const addr = row.querySelector('.wl-addr').value;
+                if (name && addr) {
+                    data.whitelist.push({ name, address: addr });
+                }
+            });
+
+            // Policies
+            document.querySelectorAll('#policies_container .dynamic-row-policy').forEach(row => {
+                const nameInput = row.querySelector('.p-name');
+                if (!nameInput) return; // Skip header
+                const name = nameInput.value;
+                const src = row.querySelector('.p-src').value;
+                const dst = row.querySelector('.p-dst').value;
+                const srcaddr = row.querySelector('.p-srcaddr').value;
+                const dstaddr = row.querySelector('.p-dstaddr').value;
+                const action = row.querySelector('.p-action').value;
+                if (name) {
+                    data.custom_policies.push({
+                        name,
+                        srcintf: src,
+                        dstintf: dst,
+                        srcaddr: srcaddr.split(',').map(s => s.trim()),
+                        dstaddr: dstaddr.split(',').map(s => s.trim()),
+                        action: action,
+                        nat: true
+                    });
+                }
+            });
+
+            // Health Checks
+            document.querySelectorAll('#health_checks_container .dynamic-row').forEach(row => {
+                const name = row.querySelector('.hc-name').value;
+                const server = row.querySelector('.hc-server').value;
+                if (name && server) {
+                    data.sdwan_health_checks.push({
+                        name,
+                        server,
+                        protocol: 'dns'
+                    });
+                }
+            });
+
             return data;
+        }
+
+        function addDynamicRow(containerId) {
+            const container = document.getElementById(containerId);
+            const row = document.createElement('div');
+            row.className = 'dynamic-row';
+            row.innerHTML = `
+                <div class="form-group"><input type="text" class="wl-name" placeholder="Nombre (ej. WEB-SERVER)"></div>
+                <div class="form-group"><input type="text" class="wl-addr" placeholder="IP/Red/FQDN"></div>
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove()">✕</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function addPolicyRow() {
+            const container = document.getElementById('policies_container');
+            const row = document.createElement('div');
+            row.className = 'dynamic-row-policy';
+            // Added columns for srcaddr and dstaddr
+            row.style.gridTemplateColumns = '1.2fr 1fr 1fr 1fr 1fr 0.8fr auto';
+            const ifaces = getAvailableInterfaces().map(i => `<option value="${i}">${i}</option>`).join('');
+
+            row.innerHTML = `
+                <div class="form-group"><input type="text" class="p-name" placeholder="Permit-Web"></div>
+                <div class="form-group">
+                    <select class="p-src">${ifaces}</select>
+                </div>
+                <div class="form-group">
+                    <select class="p-dst">${ifaces}</select>
+                </div>
+                <div class="form-group"><input type="text" class="p-srcaddr" value="all" title="Usa nombres de Whitelist, separa por coma"></div>
+                <div class="form-group"><input type="text" class="p-dstaddr" value="all" title="Usa nombres de Whitelist, separa por coma"></div>
+                <div class="form-group">
+                    <select class="p-action">
+                        <option value="accept">Accept</option>
+                        <option value="deny">Deny</option>
+                    </select>
+                </div>
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove()">✕</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function getAvailableInterfaces() {
+            const interfaces = ['any', 'virtual-wan-link'];
+
+            // Scan WANs
+            for (let i = 1; i <= 4; i++) {
+                const ip = document.getElementById(`wan${i}_ip`);
+                if (ip && ip.value.trim()) {
+                    interfaces.push(`wan${i}`);
+                }
+            }
+
+            // Scan LANs
+            for (let i = 1; i <= 4; i++) {
+                const ip = document.getElementById(`lan${i}_ip`);
+                if (ip && ip.value.trim()) {
+                    const vlanInput = document.getElementById(`lan${i}_vlan`);
+                    const vlanId = parseInt(vlanInput.value);
+                    if (vlanId > 1) {
+                        interfaces.push(`VLAN${vlanId}`);
+                    } else {
+                        interfaces.push(i === 1 ? 'lan' : `lan${i}`);
+                    }
+                }
+            }
+            return [...new Set(interfaces)];
+        }
+
+        function updatePolicySelectors() {
+            const available = getAvailableInterfaces();
+            document.querySelectorAll('.p-src, .p-dst').forEach(select => {
+                const currentVal = select.value;
+                select.innerHTML = '';
+                available.forEach(iface => {
+                    const opt = document.createElement('option');
+                    opt.value = iface;
+                    opt.textContent = iface;
+                    select.appendChild(opt);
+                });
+                if (available.includes(currentVal)) {
+                    select.value = currentVal;
+                }
+            });
+            showAlert('Lista de interfaces actualizada en las políticas', 'success');
+        }
+
+        function toggleWebfilterCard() {
+            const template = document.getElementById('policy_template').value;
+            const card = document.getElementById('webfilter_card');
+            if (template === 'standard' || template === 'advanced') {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        }
+
+        function addHealthCheckRow() {
+            const container = document.getElementById('health_checks_container');
+            const row = document.createElement('div');
+            row.className = 'dynamic-row';
+            row.innerHTML = `
+                <div class="form-group"><input type="text" class="hc-name" placeholder="Check-Google"></div>
+                <div class="form-group"><input type="text" class="hc-server" placeholder="8.8.8.8"></div>
+                <button type="button" class="remove-btn" onclick="this.parentElement.remove()">✕</button>
+            `;
+            container.appendChild(row);
         }
 
 

@@ -1,7 +1,16 @@
-from pydantic import BaseModel, Field, IPvAnyAddress, field_validator, model_validator
+from pydantic import BaseModel, Field, IPvAnyAddress, field_validator, model_validator, BeforeValidator
+from typing_extensions import Annotated
 from typing import List, Optional, Literal, Union
 import ipaddress
 import re
+
+def empty_to_none(v):
+    if v == "":
+        return None
+    return v
+
+# Annotated type for IP that treats "" as None
+EmptyStrToNoneIP = Annotated[Optional[IPvAnyAddress], BeforeValidator(empty_to_none)]
 
 class SiteInfo(BaseModel):
     name: str = Field(..., min_length=1, max_length=64)
@@ -74,13 +83,14 @@ class WanInterface(BaseModel):
         return self
 
 class LanInterface(BaseModel):
+    # ... (existing fields)
     interface_name: str
     ip_address: IPvAnyAddress
     subnet_mask: str
     vlan_id: Optional[int] = Field(None, ge=1, le=4094)
     dhcp_enabled: bool = False
-    dhcp_range_start: Optional[IPvAnyAddress] = None
-    dhcp_range_end: Optional[IPvAnyAddress] = None
+    dhcp_range_start: EmptyStrToNoneIP = None
+    dhcp_range_end: EmptyStrToNoneIP = None
 
     @field_validator('subnet_mask')
     @classmethod
@@ -95,15 +105,37 @@ class LanInterface(BaseModel):
                 raise ValueError("DHCP range start and end are required when DHCP is enabled")
             
             network = ipaddress.IPv4Network(f"{self.ip_address}/{self.subnet_mask}", strict=False)
-            if ipaddress.IPv4Address(str(self.dhcp_range_start)) not in network:
+            if self.dhcp_range_start and ipaddress.IPv4Address(str(self.dhcp_range_start)) not in network:
                  raise ValueError(f"DHCP start {self.dhcp_range_start} is not in the same subnet")
-            if ipaddress.IPv4Address(str(self.dhcp_range_end)) not in network:
+            if self.dhcp_range_end and ipaddress.IPv4Address(str(self.dhcp_range_end)) not in network:
                  raise ValueError(f"DHCP end {self.dhcp_range_end} is not in the same subnet")
         return self
 
+class FirewallPolicy(BaseModel):
+    name: str
+    srcintf: str = "any"
+    dstintf: str = "any"
+    srcaddr: Union[str, List[str]] = "all"
+    dstaddr: Union[str, List[str]] = "all"
+    action: Literal["accept", "deny"] = "accept"
+    nat: bool = True
+    service: str = "ALL"
+
+class WhitelistEntry(BaseModel):
+    name: str
+    address: str  # Can be IP, Subnet or FQDN
+
+class SdwanHealthCheck(BaseModel):
+    name: str = "Default_Health"
+    server: str = "8.8.8.8"
+    protocol: Literal["ping", "dns", "http"] = "dns"
+    interval: int = 1000
+    failtime: int = 5
+    recoverytime: int = 5
+
 class Services(BaseModel):
-    dns_servers: List[Union[IPvAnyAddress, str]] = []
-    ntp_servers: List[Union[IPvAnyAddress, str]] = []
+    dns_servers: List[Union[EmptyStrToNoneIP, str]] = []
+    ntp_servers: List[Union[EmptyStrToNoneIP, str]] = []
 
     @field_validator('dns_servers', 'ntp_servers')
     @classmethod
@@ -125,3 +157,7 @@ class NetworkParams(BaseModel):
     lan_interfaces: List[LanInterface] = []
     services: Optional[Services] = Field(default_factory=Services)
     policy_template: Literal["basic", "standard", "advanced", "custom"] = "basic"
+    custom_policies: List[FirewallPolicy] = []
+    whitelist: List[WhitelistEntry] = []
+    sdwan_health_checks: List[SdwanHealthCheck] = []
+    webfilter_categories: List[int] = []
