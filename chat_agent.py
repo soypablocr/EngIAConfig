@@ -114,7 +114,8 @@ class ChatAgent:
             ],
             "services": { "dns_servers": ["8.8.8.8"], "ntp_servers": ["pool.ntp.org"] },
             "webfilter_categories": [2, 12] (IDs for Pornography/Malware if mentioned),
-            "policy_template": "basic|standard|advanced"
+            "policy_template": "basic|standard|advanced",
+            "explanation": "Brief reasoning for the choices made (e.g. why this model, why these interfaces)."
         }
 
         Rules:
@@ -122,6 +123,7 @@ class ChatAgent:
         2. If the user mentions "Guest", create a VLAN (e.g., ID 10) for it on LAN interfaces.
         3. If the user mentions specific IPs, use them. Otherwise, generate realistic example IPs (RFC1918 for LAN, Public for WAN).
         4. Infer the Vendor if possible (e.g. "MX64" -> meraki). Default to "fortinet" if unsure.
+        5. The 'explanation' field is MANADATORY. Explain your logic clearly to the user.
         """
 
         try:

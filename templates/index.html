@@ -414,10 +414,16 @@
 
 <body>
     <div class="container">
-        <a href="/logout"
-            style="position: absolute; top: 1rem; right: 1rem; color: var(--text-muted); text-decoration: none; border: 1px solid var(--glass-border); padding: 0.5rem 1rem; border-radius: 20px; transition: all 0.3s; font-size: 0.9rem; background: rgba(0,0,0,0.3);">
-            🔒 Salir
-        </a>
+        <div style="position: absolute; top: 1rem; right: 1rem; display: flex; gap: 1rem;">
+            <a href="/admin/logs"
+                style="color: var(--text-muted); text-decoration: none; border: 1px solid var(--glass-border); padding: 0.5rem 1rem; border-radius: 20px; transition: all 0.3s; font-size: 0.9rem; background: rgba(0,0,0,0.3);">
+                📜 Logs
+            </a>
+            <a href="/logout"
+                style="color: var(--text-muted); text-decoration: none; border: 1px solid var(--glass-border); padding: 0.5rem 1rem; border-radius: 20px; transition: all 0.3s; font-size: 0.9rem; background: rgba(0,0,0,0.3);">
+                🔒 Salir
+            </a>
+        </div>
 
         <header>
             <h1>ENGIA CONFIG</h1>
@@ -442,6 +448,16 @@
             <div id="magicLoading"
                 style="display: none; text-align: center; color: var(--primary); margin-top: 0.5rem; font-size: 0.9rem;">
                 <span class="pulse">🧠</span> Analizando requerimientos con IA...
+            </div>
+
+            <!-- AI Insights (Hidden by default) -->
+            <div id="aiInsights"
+                style="display: none; background: rgba(16, 185, 129, 0.1); border: 1px solid var(--success); border-radius: 12px; padding: 1rem; margin-top: 1rem; animation: slideDown 0.5s ease-out;">
+                <h4
+                    style="color: var(--success); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <span>🤖</span> AI Insights
+                </h4>
+                <p id="aiExplanation" style="color: var(--text-main); font-size: 0.95rem; font-style: italic;"></p>
             </div>
         </div>
 
@@ -888,7 +904,7 @@
     <footer
         style="margin-top: 4rem; text-align: center; padding: 2rem; border-top: 1px solid var(--glass-border); color: var(--text-muted); font-size: 0.9rem;">
         <p>&copy; 2026 ENGIA Config. Precision Engineering for Network Security.</p>
-        <p style="margin-top: 0.5rem; opacity: 0.5;">Powered by Advanced Agentic Intelligence</p>
+        <p style="margin-top: 0.5rem; opacity: 0.8;">Creado por <strong>Pablo Arce</strong> usando IA, Año 2026 🚀</p>
     </footer>
     </div>
 
@@ -938,6 +954,7 @@
             const btn = document.getElementById('magicBtn');
 
             loading.style.display = 'block';
+            document.getElementById('aiInsights').style.display = 'none'; // Hide previous insights
             btn.disabled = true;
             btn.innerText = 'PROCESANDO...';
 
@@ -955,6 +972,15 @@
 
                 if (result.success && result.config) {
                     applyMagicConfig(result.config);
+
+                    // Show AI Explanation
+                    if (result.config.explanation) {
+                        const aiDiv = document.getElementById('aiInsights');
+                        const aiText = document.getElementById('aiExplanation');
+                        aiText.innerText = result.config.explanation;
+                        aiDiv.style.display = 'block';
+                    }
+
                     showAlert("✨ ¡Configuración mágica aplicada!", "success");
                 } else {
                     showAlert("Error: " + (result.error || "No se pudo generar la configuración."), "error");

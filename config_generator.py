@@ -57,6 +57,8 @@ class NetworkConfigGenerator:
                 'vendor': params_dict.get('device', {}).get('vendor'),
                 'site_name': params_dict.get('site_info', {}).get('name', 'Unknown')
             }
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
         
         vendor_name = params.device.vendor.lower()
         vendor_class = self.VENDOR_CLASSES.get(vendor_name)

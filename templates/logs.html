@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Logs - EngIA Config</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #c5a059;
+            --primary-dark: #a68546;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --accent-gradient: linear-gradient(135deg, #c5a059 0%, #a68546 100%);
+            --bg-gradient: radial-gradient(circle at top right, #1e293b, #0f172a);
+        }
+
+        body {
+            background: var(--bg-dark);
+            background-image: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            font-family: 'Outfit', sans-serif;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        h1 {
+            font-size: 2rem;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        a.btn {
+            text-decoration: none;
+            color: white;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            transition: all 0.3s;
+        }
+
+        a.btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .table-container {
+            background: var(--card-bg);
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            overflow: hidden;
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 1rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        th {
+            background: rgba(0, 0, 0, 0.2);
+            font-weight: 600;
+            color: var(--primary);
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .tag {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .tag-login {
+            background: rgba(16, 185, 129, 0.2);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .tag-error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .tag-magic {
+            background: rgba(197, 160, 89, 0.2);
+            color: #fcd34d;
+            border: 1px solid rgba(197, 160, 89, 0.4);
+        }
+
+        .tag-gen {
+            background: rgba(59, 130, 246, 0.2);
+            color: #93c5fd;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>📜 Audit Logs</h1>
+            <a href="/" class="btn">← Volver al Inicio</a>
+        </header>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 180px;">Timestamp</th>
+                        <th style="width: 150px;">Usuario</th>
+                        <th style="width: 150px;">Acción</th>
+                        <th>Detalles</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td style="color: var(--text-muted); font-size: 0.9rem;">{{ log.timestamp }}</td>
+                        <td style="font-weight: 600;">{{ log.user }}</td>
+                        <td>
+                            {% if 'LOGIN' in log.action %}
+                            <span class="tag tag-login">{{ log.action }}</span>
+                            {% elif 'ERROR' in log.action or 'FAILED' in log.action %}
+                            <span class="tag tag-error">{{ log.action }}</span>
+                            {% elif 'MAGIC' in log.action %}
+                            <span class="tag tag-magic">{{ log.action }}</span>
+                            {% else %}
+                            <span class="tag tag-gen">{{ log.action }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="color: var(--text-muted); font-size: 0.95rem;">{{ log.details }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                            No hay registros de auditoría aún.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <p style="text-align: center; margin-top: 2rem; color: var(--text-muted); font-size: 0.9rem;">
+            Mostrando los últimos 100 registros.
+        </p>
+    </div>
+</body>
+
+</html>

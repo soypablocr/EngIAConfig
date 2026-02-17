@@ -1,9 +1,13 @@
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for, flash
 from config_generator import NetworkConfigGenerator
 from chat_agent import ChatAgent
 import io
 import json
 import os
+import random
+import sqlite3
+from datetime import datetime
+from functools import wraps
 
 app = Flask(__name__)
 generator = NetworkConfigGenerator()
@@ -19,9 +23,6 @@ app.secret_key = os.environ.get("SECRET_KEY", "super-secret-key-change-in-produc
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
 
-from functools import wraps
-from flask import session, redirect, url_for, flash
-
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -29,6 +30,40 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
+
+# --- Audit Log System ---
+DB_NAME = "audit.db"
+
+def init_db():
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    user TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    details TEXT
+                )
+            ''')
+            conn.commit()
+    except Exception as e:
+        print(f"DB Init Error: {e}")
+
+def log_action(user, action, details=None):
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            cursor = conn.cursor()
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute('INSERT INTO logs (timestamp, user, action, details) VALUES (?, ?, ?, ?)',
+                           (timestamp, user, action, str(details) if details else ""))
+            conn.commit()
+    except Exception as e:
+        print(f"Logging Error: {e}")
+
+# Initialize DB on startup
+init_db()
 
 def require_api_key(f):
     def decorated(*args, **kwargs):
@@ -47,16 +82,33 @@ def login():
         
         if username == ADMIN_USER and password == ADMIN_PASSWORD:
             session['user'] = username
+            log_action(username, "LOGIN", "User logged in successfully")
             return redirect(url_for('index'))
         else:
+            log_action(username or "unknown", "LOGIN_FAILED", "Invalid credentials")
             flash('Credenciales incorrectas', 'error')
             
     return render_template('login.html')
 
 @app.route('/logout')
 def logout():
+    user = session.get('user', 'unknown')
+    log_action(user, "LOGOUT", "User logged out")
     session.pop('user', None)
     return redirect(url_for('login'))
+
+@app.route('/admin/logs')
+@login_required
+def view_logs():
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM logs ORDER BY id DESC LIMIT 100')
+            logs = cursor.fetchall()
+        return render_template('logs.html', logs=logs)
+    except Exception as e:
+        return f"Error accessing logs: {e}"
 
 @app.route('/')
 @login_required
@@ -84,14 +136,25 @@ def generate_config():
     try:
         params = request.json
         if not params:
+            log_action(session.get('user', 'api'), "GENERATE_ERROR", "No parameters received")
             return jsonify({'error': 'No se recibieron parámetros'}), 400
         
         result = generator.generate(params)
+        
+        if result.get('success'):
+            log_action(session.get('user', 'api'), "GENERATE_CONFIG", f"Generated config for {params.get('device', {}).get('vendor', 'unknown')}")
+        else:
+            error_msg = result.get('error')
+            if not error_msg and result.get('errors'):
+                error_msg = "; ".join(result['errors'])
+            log_action(session.get('user', 'api'), "GENERATE_ERROR", f"Config generation failed: {error_msg}")
+            
         return jsonify(result)
         
     except Exception as e:
         import traceback
         traceback.print_exc()
+        log_action(session.get('user', 'api'), "GENERATE_EXCEPTION", str(e))
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/download', methods=['POST'])
@@ -247,8 +310,10 @@ def magic_fill():
         config_json = chat_agent.extract_config_from_text(text)
         
         if "error" in config_json:
+             log_action(session.get('user', 'api'), "MAGIC_FILL_ERROR", config_json["error"])
              return jsonify({'error': config_json["error"]}), 500
 
+        log_action(session.get('user', 'api'), "MAGIC_FILL", f"Processed prompt: {text[:50]}...")
         return jsonify({'success': True, 'config': config_json})
 
     except Exception as e:
