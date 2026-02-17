@@ -14,6 +14,22 @@ API_KEY = os.environ.get("ENGIA_API_KEY")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBXztlBxZaOJz_MAK7erf20gYi0mEaiv-g") # Fallback to provided key if env var not set
 chat_agent = ChatAgent(api_key=GEMINI_KEY)
 
+# Authentication Config
+app.secret_key = os.environ.get("SECRET_KEY", "super-secret-key-change-in-production")
+ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
+
+from functools import wraps
+from flask import session, redirect, url_for, flash
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 def require_api_key(f):
     def decorated(*args, **kwargs):
         if API_KEY:
@@ -23,7 +39,27 @@ def require_api_key(f):
     decorated.__name__ = f.__name__
     return decorated
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        if username == ADMIN_USER and password == ADMIN_PASSWORD:
+            session['user'] = username
+            return redirect(url_for('index'))
+        else:
+            flash('Credenciales incorrectas', 'error')
+            
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('user', None)
+    return redirect(url_for('login'))
+
 @app.route('/')
+@login_required
 def index():
     """Página principal con formulario"""
     return render_template('index.html')
@@ -41,6 +77,7 @@ def get_vendors():
     })
 
 @app.route('/api/generate', methods=['POST'])
+@login_required
 @require_api_key
 def generate_config():
     """Genera configuración"""
@@ -58,6 +95,7 @@ def generate_config():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/download', methods=['POST'])
+@login_required
 @require_api_key
 def download_config():
     """Descarga configuración como archivo"""
@@ -95,6 +133,7 @@ def download_config():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/validate', methods=['POST'])
+@login_required
 @require_api_key
 def validate_params():
     """Valida parámetros sin generar config"""
@@ -116,6 +155,7 @@ def validate_params():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/push/meraki', methods=['POST'])
+@login_required
 @require_api_key
 def push_meraki():
     """Genera y empuja configuración a Meraki Dashboard"""
@@ -154,6 +194,7 @@ def push_meraki():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/push/cato', methods=['POST'])
+@login_required
 @require_api_key
 def push_cato():
     """Genera y empuja configuración a Cato Networks (GraphQL)"""
@@ -191,7 +232,32 @@ def push_cato():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/magic-fill', methods=['POST'])
+@login_required
+@require_api_key
+def magic_fill():
+    """Genera JSON de configuración desde texto natural"""
+    try:
+        data = request.json
+        text = data.get('text')
+        
+        if not text:
+            return jsonify({'error': 'No text provided'}), 400
+
+        config_json = chat_agent.extract_config_from_text(text)
+        
+        if "error" in config_json:
+             return jsonify({'error': config_json["error"]}), 500
+
+        return jsonify({'success': True, 'config': config_json})
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/chat', methods=['POST'])
+@login_required
 def chat():
     """Endpoint para el chatbot"""
     try:

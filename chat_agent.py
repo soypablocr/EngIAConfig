@@ -76,3 +76,65 @@ class ChatAgent:
         
         return "I'm currently running in 'Offline Mode' (Rule-Based) because the AI service is unavailable. To unlock my full capabilities, please check the API Key configuration."
 
+    def extract_config_from_text(self, text):
+        """
+        Interprets natural language text and returns a JSON object matching the form structure.
+        """
+        if not self.model:
+            return {"error": "AI service unavailable. Check API Key."}
+
+        # Schema definition for the LLM
+        schema_prompt = """
+        You are a Network Configuration Converter. I will give you a natural language description of a network requirement.
+        You must convert it into a JSON object that EXACTLY matches this structure (fill missing fields with reasonable defaults or null):
+
+        {
+            "site_info": { 
+                "name": "SITE-001 (or inferred)", 
+                "customer": "Customer Name (or null)", 
+                "location": "Location (or null)", 
+                "timezone": "America/Costa_Rica" 
+            },
+            "device": { 
+                "vendor": "fortinet|meraki|velocloud|bigleaf|cato", 
+                "model": "Gate-60F (inferred from vendor)", 
+                "firmware_version": "7.0 (or similar)" 
+            },
+            "wan_interfaces": [
+                { 
+                    "interface_name": "wan1", "ip_address": "1.2.3.4", "subnet_mask": "255.255.255.252", 
+                    "gateway": "1.2.3.1", "bandwidth_mbps": 100, "isp_name": "ISP1", "priority": "primary" 
+                }
+            ],
+            "lan_interfaces": [
+                { 
+                    "interface_name": "lan", "ip_address": "192.168.1.1", "subnet_mask": "255.255.255.0", 
+                    "vlan_id": null, "vlan_name": "LAN", "dhcp_enabled": true 
+                }
+            ],
+            "services": { "dns_servers": ["8.8.8.8"], "ntp_servers": ["pool.ntp.org"] },
+            "webfilter_categories": [2, 12] (IDs for Pornography/Malware if mentioned),
+            "policy_template": "basic|standard|advanced"
+        }
+
+        Rules:
+        1. Return ONLY valid JSON. No markdown formatting.
+        2. If the user mentions "Guest", create a VLAN (e.g., ID 10) for it on LAN interfaces.
+        3. If the user mentions specific IPs, use them. Otherwise, generate realistic example IPs (RFC1918 for LAN, Public for WAN).
+        4. Infer the Vendor if possible (e.g. "MX64" -> meraki). Default to "fortinet" if unsure.
+        """
+
+        try:
+            full_prompt = f"{schema_prompt}\n\nUser Description: {text}"
+            response = self.model.generate_content(full_prompt)
+            
+            if response and response.text:
+                # Clean up markdown if present
+                clean_text = response.text.replace('```json', '').replace('```', '').strip()
+                return json.loads(clean_text)
+        except Exception as e:
+            print(f"ERROR: Magic Fill failed: {e}")
+            return {"error": str(e)}
+        
+        return {"error": "Failed to generate configuration."}
+

@@ -414,12 +414,90 @@
 
 <body>
     <div class="container">
+        <a href="/logout"
+            style="position: absolute; top: 1rem; right: 1rem; color: var(--text-muted); text-decoration: none; border: 1px solid var(--glass-border); padding: 0.5rem 1rem; border-radius: 20px; transition: all 0.3s; font-size: 0.9rem; background: rgba(0,0,0,0.3);">
+            🔒 Salir
+        </a>
+
         <header>
             <h1>ENGIA CONFIG</h1>
             <p>Premium Network Provisioning System</p>
         </header>
 
         <div id="alerts"></div>
+
+        <!-- Magic Bar -->
+        <div class="magic-bar-container" style="margin-bottom: 2rem; animation: fadeIn 1s ease-out;">
+            <div style="position: relative; max-width: 800px; margin: 0 auto;">
+                <textarea id="magicInput"
+                    placeholder="✨ Describe tu red (ej. 'Fortinet con 2 WANs y una red de invitados')..."
+                    style="width: 100%; min-height: 60px; max-height: 200px; padding: 1rem 1rem 1rem 3.5rem; font-size: 1.1rem; border-radius: 25px; border: 2px solid var(--primary); background: rgba(15, 23, 42, 0.8); color: white; box-shadow: 0 0 15px rgba(197, 160, 89, 0.2); outline: none; resize: none; overflow-y: hidden; line-height: 1.5; font-family: inherit;"
+                    oninput="autoExpand(this)" onkeydown="handleMagicKey(event)"></textarea>
+                <span style="position: absolute; left: 1.2rem; top: 1.2rem; font-size: 1.5rem;">✨</span>
+                <button onclick="magicFill()" id="magicBtn"
+                    style="position: absolute; right: 10px; bottom: 10px; border-radius: 20px; padding: 0.5rem 1.5rem; background: var(--primary); color: #000; border: none; font-weight: 800; cursor: pointer; transition: all 0.3s;">
+                    GENERAR
+                </button>
+            </div>
+            <div id="magicLoading"
+                style="display: none; text-align: center; color: var(--primary); margin-top: 0.5rem; font-size: 0.9rem;">
+                <span class="pulse">🧠</span> Analizando requerimientos con IA...
+            </div>
+        </div>
+
+        <script>
+            function autoExpand(field) {
+                // Reset height to shrink if needed
+                field.style.height = 'inherit';
+
+                // Calculate new height (min 60px)
+                const computed = window.getComputedStyle(field);
+                const height = parseInt(computed.getPropertyValue('border-top-width'), 10)
+                    + parseInt(computed.getPropertyValue('padding-top'), 10)
+                    + field.scrollHeight
+                    + parseInt(computed.getPropertyValue('padding-bottom'), 10)
+                    + parseInt(computed.getPropertyValue('border-bottom-width'), 10);
+
+                field.style.height = Math.max(height - 20, 60) + 'px';
+            }
+
+            function handleMagicKey(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    magicFill();
+                }
+            }
+        </script>
+
+        <style>
+            .pulse {
+                animation: pulse 1.5s infinite;
+            }
+
+            @keyframes pulse {
+                0% {
+                    opacity: 0.5;
+                }
+
+                50% {
+                    opacity: 1;
+                }
+
+                100% {
+                    opacity: 0.5;
+                }
+            }
+
+            input#magicInput:focus {
+                box-shadow: 0 0 25px rgba(197, 160, 89, 0.4) !important;
+                border-color: #fff !important;
+            }
+
+            button#magicBtn:hover {
+                transform: scale(1.05);
+                box-shadow: 0 0 10px rgba(197, 160, 89, 0.5);
+            }
+        </style>
 
         <!-- Single Column Layout (Removed Grid) -->
         <div style="max-width: 900px; margin: 0 auto;">
@@ -851,6 +929,171 @@
         // --- Existing Logic ---
         let catalogData = {};
 
+        async function magicFill() {
+            const input = document.getElementById('magicInput');
+            const text = input.value.trim();
+            if (!text) return showAlert("Por favor describe tu requerimiento primero.", "error");
+
+            const loading = document.getElementById('magicLoading');
+            const btn = document.getElementById('magicBtn');
+
+            loading.style.display = 'block';
+            btn.disabled = true;
+            btn.innerText = 'PROCESANDO...';
+
+            try {
+                const response = await fetch('/api/magic-fill', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': document.getElementById('api_key').value
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+
+                const result = await response.json();
+
+                if (result.success && result.config) {
+                    applyMagicConfig(result.config);
+                    showAlert("✨ ¡Configuración mágica aplicada!", "success");
+                } else {
+                    showAlert("Error: " + (result.error || "No se pudo generar la configuración."), "error");
+                }
+
+            } catch (error) {
+                showAlert("Error de conexión: " + error.message, "error");
+            } finally {
+                loading.style.display = 'none';
+                btn.disabled = false;
+                btn.innerText = 'GENERAR';
+            }
+        }
+
+        function applyMagicConfig(config) {
+            // 1. Site Info
+            if (config.site_info) {
+                if (config.site_info.name) document.getElementById('site_name').value = config.site_info.name;
+                if (config.site_info.customer) document.getElementById('customer').value = config.site_info.customer;
+                if (config.site_info.location) document.getElementById('location').value = config.site_info.location;
+                if (config.site_info.timezone) document.getElementById('timezone').value = config.site_info.timezone;
+            }
+
+            // 2. Device (Trigger change events)
+            if (config.device) {
+                if (config.device.vendor) {
+                    const vendorSelect = document.getElementById('vendor');
+                    vendorSelect.value = config.device.vendor.toLowerCase();
+                    loadModels(); // Important: Refresh models/firmware
+
+                    // Small delay to allow models to load
+                    setTimeout(() => {
+                        if (config.device.model) {
+                            // Try to match model (case insensitive)
+                            const modelSelect = document.getElementById('model');
+                            for (let i = 0; i < modelSelect.options.length; i++) {
+                                if (modelSelect.options[i].value.toLowerCase() === config.device.model.toLowerCase()) {
+                                    modelSelect.selectedIndex = i;
+                                    break;
+                                }
+                            }
+                        }
+                        if (config.device.firmware_version) {
+                            const fwSelect = document.getElementById('firmware_version');
+                            // Simple match or default
+                            for (let i = 0; i < fwSelect.options.length; i++) {
+                                if (fwSelect.options[i].value.includes(config.device.firmware_version)) {
+                                    fwSelect.selectedIndex = i;
+                                    break;
+                                }
+                            }
+                        }
+                    }, 100);
+                }
+            }
+
+            // 3. WAN Interfaces
+            if (config.wan_interfaces && Array.isArray(config.wan_interfaces)) {
+                // Hide all first
+                for (let i = 2; i <= 4; i++) document.getElementById(`wan${i}_section`).classList.add('hidden');
+
+                config.wan_interfaces.forEach((wan, index) => {
+                    const i = index + 1;
+                    if (i > 4) return;
+
+                    if (i > 1) {
+                        document.getElementById(`wan${i}_section`).classList.remove('hidden');
+                    }
+
+                    document.getElementById(`wan${i}_ip`).value = wan.ip_address || '';
+                    document.getElementById(`wan${i}_mask`).value = wan.subnet_mask || '';
+                    document.getElementById(`wan${i}_gw`).value = wan.gateway || '';
+                    if (wan.bandwidth_mbps) document.getElementById(`wan${i}_bw`).value = wan.bandwidth_mbps;
+                    if (wan.isp_name) document.getElementById(`wan${i}_isp`).value = wan.isp_name;
+                });
+
+                // Update button visibility
+                visibleWanCount = config.wan_interfaces.length;
+                if (visibleWanCount < 1) visibleWanCount = 1;
+                document.getElementById('add_wan_btn').style.display = (visibleWanCount >= 4) ? 'none' : 'block';
+            }
+
+            // 4. LAN Interfaces
+            if (config.lan_interfaces && Array.isArray(config.lan_interfaces)) {
+                for (let i = 2; i <= 4; i++) document.getElementById(`lan${i}_section`).classList.add('hidden');
+
+                config.lan_interfaces.forEach((lan, index) => {
+                    const i = index + 1;
+                    if (i > 4) return;
+
+                    if (i > 1) {
+                        document.getElementById(`lan${i}_section`).classList.remove('hidden');
+                    }
+
+                    document.getElementById(`lan${i}_ip`).value = lan.ip_address || '';
+                    document.getElementById(`lan${i}_mask`).value = lan.subnet_mask || '';
+                    if (lan.vlan_id) document.getElementById(`lan${i}_vlan`).value = lan.vlan_id;
+                    if (lan.vlan_name) document.getElementById(`lan${i}_vlan_name`).value = lan.vlan_name;
+
+                    const dhcpCheck = document.getElementById(`lan${i}_dhcp_enabled`);
+                    if (dhcpCheck) {
+                        dhcpCheck.checked = lan.dhcp_enabled !== false; // Default true
+                        // Trigger change to show/hide range
+                        dhcpCheck.dispatchEvent(new Event('change', { 'bubbles': true }));
+                    }
+                });
+
+                visibleLanCount = config.lan_interfaces.length;
+                if (visibleLanCount < 1) visibleLanCount = 1;
+                document.getElementById('add_lan_btn').style.display = (visibleLanCount >= 4) ? 'none' : 'block';
+            }
+
+            // 5. Services
+            if (config.services) {
+                if (config.services.dns_servers) {
+                    if (config.services.dns_servers[0]) document.getElementById('dns1').value = config.services.dns_servers[0];
+                    if (config.services.dns_servers[1]) document.getElementById('dns2').value = config.services.dns_servers[1];
+                }
+                if (config.services.ntp_servers && config.services.ntp_servers[0]) {
+                    document.getElementById('ntp').value = config.services.ntp_servers[0];
+                }
+            }
+
+            // 6. Policy & Webfilter
+            if (config.policy_template) {
+                document.getElementById('policy_template').value = config.policy_template;
+                toggleWebfilterCard(); // Update UI
+            }
+
+            if (config.webfilter_categories && Array.isArray(config.webfilter_categories)) {
+                // Uncheck all first
+                document.querySelectorAll('.wf-cat').forEach(cb => cb.checked = false);
+                config.webfilter_categories.forEach(catId => {
+                    const cb = document.querySelector(`.wf-cat[value="${catId}"]`);
+                    if (cb) cb.checked = true;
+                });
+            }
+        }
+
         async function fetchCatalog() {
             try {
                 const response = await fetch('/api/catalog');
@@ -876,6 +1119,16 @@
             const vendor = document.getElementById('vendor').value;
             const modelSelect = document.getElementById('model');
             const firmwareSelect = document.getElementById('firmware_version');
+
+            // Reset other Device fields
+            document.getElementById('policy_template').value = 'basic';
+
+            // Reset Webfilter Categories
+            const wfCard = document.getElementById('webfilter_card');
+            if (wfCard) {
+                wfCard.style.display = 'none';
+                document.querySelectorAll('.wf-cat').forEach(cb => cb.checked = false);
+            }
 
             if (!catalogData[vendor]) return;
 
