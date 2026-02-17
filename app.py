@@ -1,14 +1,18 @@
 from flask import Flask, request, jsonify, render_template, send_file
 from config_generator import NetworkConfigGenerator
+from chat_agent import ChatAgent
 import io
 import json
 import os
 
 app = Flask(__name__)
 generator = NetworkConfigGenerator()
-
 # Minimal Security
 API_KEY = os.environ.get("ENGIA_API_KEY")
+
+# Initialize Chat Agent with LLM Key
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBXztlBxZaOJz_MAK7erf20gYi0mEaiv-g") # Fallback to provided key if env var not set
+chat_agent = ChatAgent(api_key=GEMINI_KEY)
 
 def require_api_key(f):
     def decorated(*args, **kwargs):
@@ -182,6 +186,28 @@ def push_cato():
             'config_generated': True
         })
         
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    """Endpoint para el chatbot"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        message = data.get('message')
+        context = data.get('context', {})
+        
+        if not message:
+            return jsonify({'error': 'No message provided'}), 400
+
+        response = chat_agent.get_response(message, context)
+        return jsonify({'response': response})
+
     except Exception as e:
         import traceback
         traceback.print_exc()

@@ -315,8 +315,99 @@
             }
         }
 
-        .hidden {
+        /* Modal Styles */
+        .modal {
             display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            margin: 5% auto;
+            padding: 0;
+            border: 1px solid var(--glass-border);
+            width: 80%;
+            max-width: 900px;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: slideInModal 0.4s;
+            display: flex;
+            flex-direction: column;
+            max-height: 85vh;
+        }
+
+        @keyframes slideInModal {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            border: none;
+            font-size: 1.8rem;
+        }
+
+        .close {
+            color: var(--text-muted);
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .close:hover {
+            color: var(--error);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .modal-footer {
+            padding: 1.5rem;
+            border-top: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+        }
+
+        /* Syntax Highlighting theme */
+        pre#modal-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 1.5rem;
+            border-radius: 12px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            border: 1px solid #333;
         }
     </style>
 </head>
@@ -330,436 +421,388 @@
 
         <div id="alerts"></div>
 
-        <div class="grid">
-            <div>
-                <!-- Site Info -->
-                <div class="card">
-                    <h2>📍 Información del Sitio</h2>
-                    <div class="row">
-                        <div class="form-group">
-                            <label>Nombre del Sitio *</label>
-                            <input type="text" id="site_name" placeholder="SITE-001" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Cliente</label>
-                            <input type="text" id="customer" placeholder="Acme Corp">
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="form-group">
-                            <label>Ubicación</label>
-                            <input type="text" id="location" placeholder="San José, Costa Rica">
-                        </div>
-                        <div class="form-group">
-                            <label>Zona Horaria</label>
-                            <select id="timezone">
-                                <option value="America/Costa_Rica">Costa Rica (UTC-6)</option>
-                                <option value="America/New_York">Eastern (UTC-5)</option>
-                                <option value="America/Chicago">Central (UTC-6)</option>
-                                <option value="America/Denver">Mountain (UTC-7)</option>
-                                <option value="America/Los_Angeles">Pacific (UTC-8)</option>
-                                <option value="UTC">UTC</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Device -->
-                <div class="card" style="margin-top: 1rem;">
-                    <h2>📦 Dispositivo</h2>
-                    <div class="row">
-                        <div class="form-group">
-                            <label>Vendor *</label>
-                            <select id="vendor" onchange="loadModels()">
-                                <option value="fortinet">Fortinet</option>
-                                <option value="meraki">Meraki</option>
-                                <option value="velocloud">Velocloud (VMware SD-WAN)</option>
-                                <option value="bigleaf">Bigleaf</option>
-                                <option value="cato">CATO Networks</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Modelo *</label>
-                            <select id="model">
-                                <option>Seleccione vendor primero</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="form-group">
-                            <label>Versión de Firmware *</label>
-                            <select id="firmware_version">
-                                <option>Seleccione vendor primero</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Plantilla de Seguridad</label>
-                            <select id="policy_template" onchange="toggleWebfilterCard()">
-                                <option value="basic">Basic (Solo NAT/Allow)</option>
-                                <option value="standard">Standard (Webfilter Base)</option>
-                                <option value="advanced">Advanced (IPS + Webfilter)</option>
-                                <option value="custom">Custom (Solo Reglas Propias)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Webfilter Categories (Conditional) -->
-                    <div id="webfilter_card" class="card" style="margin-top: 1rem; display: none;">
-                        <h2>🌐 Categorías de Web Filtering</h2>
-                        <p style="font-size: 0.8rem; color: #666; margin-bottom: 1rem;">Selecciona las categorías que
-                            deseas BLOQUEAR (FortiGuard):</p>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                            <label><input type="checkbox" class="wf-cat" value="2"> Pornografía</label>
-                            <label><input type="checkbox" class="wf-cat" value="3"> Juegos de azar</label>
-                            <label><input type="checkbox" class="wf-cat" value="57"> Redes Sociales</label>
-                            <label><input type="checkbox" class="wf-cat" value="15"> Streaming Media</label>
-                            <label><input type="checkbox" class="wf-cat" value="8"> Juegos Online</label>
-                            <label><input type="checkbox" class="wf-cat" value="12"> Hacking/Malware</label>
-                            <label><input type="checkbox" class="wf-cat" value="7"> Abuso de drogas</label>
-                            <label><input type="checkbox" class="wf-cat" value="63"> Proxies/Anonymizers</label>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="form-group">
-                            <label>EngIA API Key (X-API-Key)</label>
-                            <input type="password" id="api_key" placeholder="devkey" value="devkey">
-                            <small style="color: var(--text-light); font-size: 0.7rem;">Requerida para autorizar la
-                                generación.</small>
-                        </div>
-                    </div>
-                </div>
-
-
-                <!-- WAN -->
-                <div class="card" style="margin-top: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h2>🌐 Configuración WAN</h2>
-                        <button type="button" id="add_wan_btn" class="add-interface-btn" onclick="addWanInterface()">
-                            <span>+</span> Agregar WAN
-                        </button>
-                    </div>
-
-                    <div class="interface-section">
-                        <h3>WAN 1 (Primario)</h3>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>IP Address *</label>
-                                <input type="text" id="wan1_ip" placeholder="203.0.113.10">
-                            </div>
-                            <div class="form-group">
-                                <label>Subnet Mask *</label>
-                                <input type="text" id="wan1_mask" placeholder="255.255.255.252">
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>Gateway *</label>
-                                <input type="text" id="wan1_gw" placeholder="203.0.113.9">
-                            </div>
-                            <div class="form-group">
-                                <label>Bandwidth (Mbps)</label>
-                                <input type="number" id="wan1_bw" value="100">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>ISP Name</label>
-                            <input type="text" id="wan1_isp" placeholder="ISP-Primary">
-                        </div>
-                    </div>
-
-                    <div id="wan2_section" class="interface-section hidden">
-                        <h3>WAN 2 (Secundario)</h3>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>IP Address</label>
-                                <input type="text" id="wan2_ip" placeholder="198.51.100.10">
-                            </div>
-                            <div class="form-group">
-                                <label>Subnet Mask</label>
-                                <input type="text" id="wan2_mask" placeholder="255.255.255.252">
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>Gateway</label>
-                                <input type="text" id="wan2_gw" placeholder="198.51.100.9">
-                            </div>
-                            <div class="form-group">
-                                <label>Bandwidth (Mbps)</label>
-                                <input type="number" id="wan2_bw" value="50">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>ISP Name</label>
-                            <input type="text" id="wan2_isp" placeholder="ISP-Backup">
-                        </div>
-                    </div>
-
-                    <div id="wan3_section" class="interface-section hidden">
-                        <h3>WAN 3 (Opcional)</h3>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>IP Address</label>
-                                <input type="text" id="wan3_ip" placeholder="10.0.0.10">
-                            </div>
-                            <div class="form-group">
-                                <label>Subnet Mask</label>
-                                <input type="text" id="wan3_mask" placeholder="255.255.255.0">
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>Gateway</label>
-                                <input type="text" id="wan3_gw" placeholder="10.0.0.1">
-                            </div>
-                            <div class="form-group">
-                                <label>Bandwidth (Mbps)</label>
-                                <input type="number" id="wan3_bw" value="50">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>ISP Name</label>
-                            <input type="text" id="wan3_isp" placeholder="ISP-WAN3">
-                        </div>
-                    </div>
-
-                    <div id="wan4_section" class="interface-section hidden">
-                        <h3>WAN 4 (Opcional)</h3>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>IP Address</label>
-                                <input type="text" id="wan4_ip" placeholder="10.0.1.10">
-                            </div>
-                            <div class="form-group">
-                                <label>Subnet Mask</label>
-                                <input type="text" id="wan4_mask" placeholder="255.255.255.0">
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>Gateway</label>
-                                <input type="text" id="wan4_gw" placeholder="10.0.1.1">
-                            </div>
-                            <div class="form-group">
-                                <label>Bandwidth (Mbps)</label>
-                                <input type="number" id="wan4_bw" value="50">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>ISP Name</label>
-                            <input type="text" id="wan4_isp" placeholder="ISP-WAN4">
-                        </div>
-                    </div>
-                </div>
-
-
-                <!-- LAN -->
-                <div class="card" style="margin-top: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h2>🏠 Configuración LAN</h2>
-                        <button type="button" id="add_lan_btn" class="add-interface-btn" onclick="addLanInterface()">
-                            <span>+</span> Agregar LAN
-                        </button>
-                    </div>
-
-                    <div id="lan1_section" class="interface-section">
-                        <h3>LAN 1 / VLAN</h3>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>IP Address *</label>
-                                <input type="text" id="lan1_ip" placeholder="192.168.1.1">
-                            </div>
-                            <div class="form-group">
-                                <label>Subnet Mask *</label>
-                                <input type="text" id="lan1_mask" placeholder="255.255.255.0">
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>VLAN ID</label>
-                                <input type="number" id="lan1_vlan" placeholder="10">
-                            </div>
-                            <div class="form-group">
-                                <label>VLAN Name</label>
-                                <input type="text" id="lan1_vlan_name" placeholder="Data">
-                            </div>
-                        </div>
-                        <div class="checkbox-group form-group">
-                            <input type="checkbox" id="lan1_dhcp_enabled" checked>
-                            <label for="lan1_dhcp_enabled">Habilitar DHCP Server</label>
-                        </div>
-                        <div class="row" id="lan1_dhcp_range">
-                            <div class="form-group">
-                                <label>DHCP Range Start</label>
-                                <input type="text" id="lan1_dhcp_start" placeholder="192.168.1.100">
-                            </div>
-                            <div class="form-group">
-                                <label>DHCP Range End</label>
-                                <input type="text" id="lan1_dhcp_end" placeholder="192.168.1.200">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Additional LANs -->
-                    <div id="lan2_section" class="interface-section hidden">
-                        <h3>LAN 2 / VLAN</h3>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>IP Address</label>
-                                <input type="text" id="lan2_ip" placeholder="192.168.2.1">
-                            </div>
-                            <div class="form-group">
-                                <label>Subnet Mask</label>
-                                <input type="text" id="lan2_mask" placeholder="255.255.255.0">
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>VLAN ID</label>
-                                <input type="number" id="lan2_vlan" placeholder="20">
-                            </div>
-                            <div class="form-group">
-                                <label>VLAN Name</label>
-                                <input type="text" id="lan2_vlan_name" placeholder="Voice">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="lan3_section" class="interface-section hidden">
-                        <h3>LAN 3 / VLAN</h3>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>IP Address</label>
-                                <input type="text" id="lan3_ip" placeholder="192.168.3.1">
-                            </div>
-                            <div class="form-group">
-                                <label>Subnet Mask</label>
-                                <input type="text" id="lan3_mask" placeholder="255.255.255.0">
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>VLAN ID</label>
-                                <input type="number" id="lan3_vlan" placeholder="30">
-                            </div>
-                            <div class="form-group">
-                                <label>VLAN Name</label>
-                                <input type="text" id="lan3_vlan_name" placeholder="Guest">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="lan4_section" class="interface-section hidden">
-                        <h3>LAN 4 / VLAN</h3>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>IP Address</label>
-                                <input type="text" id="lan4_ip" placeholder="192.168.4.1">
-                            </div>
-                            <div class="form-group">
-                                <label>Subnet Mask</label>
-                                <input type="text" id="lan4_mask" placeholder="255.255.255.0">
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="form-group">
-                                <label>VLAN ID</label>
-                                <input type="number" id="lan4_vlan" placeholder="40">
-                            </div>
-                            <div class="form-group">
-                                <label>VLAN Name</label>
-                                <input type="text" id="lan4_vlan_name" placeholder="IoT">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Services -->
-                <div class="card" style="margin-top: 1rem;">
-                    <h2>⚙️ Servicios</h2>
-                    <div class="row">
-                        <div class="form-group">
-                            <label>DNS Primary</label>
-                            <input type="text" id="dns1" value="8.8.8.8">
-                        </div>
-                        <div class="form-group">
-                            <label>DNS Secondary</label>
-                            <input type="text" id="dns2" value="8.8.4.4">
-                        </div>
+        <!-- Single Column Layout (Removed Grid) -->
+        <div style="max-width: 900px; margin: 0 auto;">
+            <!-- Site Info -->
+            <div class="card">
+                <h2>📍 Información del Sitio</h2>
+                <div class="row">
+                    <div class="form-group">
+                        <label>Nombre del Sitio *</label>
+                        <input type="text" id="site_name" placeholder="SITE-001" required>
                     </div>
                     <div class="form-group">
-                        <label>NTP Server</label>
-                        <input type="text" id="ntp" value="pool.ntp.org">
+                        <label>Cliente</label>
+                        <input type="text" id="customer" placeholder="Acme Corp">
                     </div>
                 </div>
-
-                <!-- Whitelist -->
-                <div class="card" style="margin-top: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h2>📝 Whitelist / Direcciones</h2>
-                        <button type="button" class="add-interface-btn" onclick="addDynamicRow('whitelist_container')">
-                            <span>+</span> Agregar
-                        </button>
+                <div class="row">
+                    <div class="form-group">
+                        <label>Ubicación</label>
+                        <input type="text" id="location" placeholder="San José, Costa Rica">
                     </div>
-                    <div id="whitelist_container">
-                        <!-- Rows added here -->
+                    <div class="form-group">
+                        <label>Zona Horaria</label>
+                        <select id="timezone">
+                            <option value="America/Costa_Rica">Costa Rica (UTC-6)</option>
+                            <option value="America/New_York">Eastern (UTC-5)</option>
+                            <option value="America/Chicago">Central (UTC-6)</option>
+                            <option value="America/Denver">Mountain (UTC-7)</option>
+                            <option value="America/Los_Angeles">Pacific (UTC-8)</option>
+                            <option value="UTC">UTC</option>
+                        </select>
                     </div>
-                </div>
-
-                <!-- Custom Policies -->
-                <div class="card" style="margin-top: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h2>🛡️ Políticas Personalizadas</h2>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button type="button" class="btn btn-success"
-                                style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="updatePolicySelectors()">
-                                🔄 Sincronizar Interfaces
-                            </button>
-                            <button type="button" class="add-interface-btn" onclick="addPolicyRow()">
-                                <span>+</span> Agregar Regla
-                            </button>
-                        </div>
-                    </div>
-                    <div id="policies_container" style="overflow-x: auto;">
-                        <!-- Policy headers -->
-                        <div class="dynamic-row-policy"
-                            style="font-size: 0.7rem; font-weight: bold; margin-bottom: 5px;">
-                            <div>Nombre</div>
-                            <div>Origen (Interface)</div>
-                            <div>Destino (Interface)</div>
-                            <div>Src Addr</div>
-                            <div>Dst Addr</div>
-                            <div>Acción</div>
-                            <div></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- SD-WAN Health Checks -->
-                <div class="card" style="margin-top: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h2>💓 SD-WAN Health Checks</h2>
-                        <button type="button" class="add-interface-btn" onclick="addHealthCheckRow()">
-                            <span>+</span> Agregar
-                        </button>
-                    </div>
-                    <div id="health_checks_container">
-                        <!-- Rows added here -->
-                    </div>
-                </div>
-
-                <div class="btn-group">
-                    <button class="btn btn-primary" onclick="generateConfig()">🚀 Generar Configuración</button>
-                    <button class="btn btn-success" onclick="downloadConfig()">📥 Descargar</button>
                 </div>
             </div>
 
-            <!-- Output Column -->
-            <div class="output-column">
-                <div class="card" style="height: 100%; min-height: 800px;">
-                    <h2>📄 Configuración Generada</h2>
-                    <pre id="output">La configuración aparecerá aquí...</pre>
+            <!-- Device -->
+            <div class="card" style="margin-top: 1rem;">
+                <h2>📦 Dispositivo</h2>
+                <div class="row">
+                    <div class="form-group">
+                        <label>Vendor *</label>
+                        <select id="vendor" onchange="loadModels()">
+                            <option value="fortinet">Fortinet</option>
+                            <option value="meraki">Meraki</option>
+                            <option value="velocloud">Velocloud (VMware SD-WAN)</option>
+                            <option value="bigleaf">Bigleaf</option>
+                            <option value="cato">CATO Networks</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Modelo *</label>
+                        <select id="model">
+                            <option>Seleccione vendor primero</option>
+                        </select>
+                    </div>
                 </div>
+                <div class="row">
+                    <div class="form-group">
+                        <label>Versión de Firmware *</label>
+                        <select id="firmware_version">
+                            <option>Seleccione vendor primero</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Plantilla de Seguridad</label>
+                        <select id="policy_template" onchange="toggleWebfilterCard()">
+                            <option value="basic">Basic (Solo NAT/Allow)</option>
+                            <option value="standard">Standard (Webfilter Base)</option>
+                            <option value="advanced">Advanced (IPS + Webfilter)</option>
+                            <option value="custom">Custom (Solo Reglas Propias)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Webfilter Categories (Conditional) -->
+                <div id="webfilter_card" class="card" style="margin-top: 1rem; display: none;">
+                    <h2>🌐 Categorías de Web Filtering</h2>
+                    <p style="font-size: 0.8rem; color: #666; margin-bottom: 1rem;">Selecciona las categorías que
+                        deseas BLOQUEAR (FortiGuard):</p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                        <label><input type="checkbox" class="wf-cat" value="2"> Pornografía</label>
+                        <label><input type="checkbox" class="wf-cat" value="3"> Juegos de azar</label>
+                        <label><input type="checkbox" class="wf-cat" value="57"> Redes Sociales</label>
+                        <label><input type="checkbox" class="wf-cat" value="15"> Streaming Media</label>
+                        <label><input type="checkbox" class="wf-cat" value="8"> Juegos Online</label>
+                        <label><input type="checkbox" class="wf-cat" value="12"> Hacking/Malware</label>
+                        <label><input type="checkbox" class="wf-cat" value="7"> Abuso de drogas</label>
+                        <label><input type="checkbox" class="wf-cat" value="63"> Proxies/Anonymizers</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="form-group">
+                        <label>EngIA API Key (X-API-Key)</label>
+                        <input type="password" id="api_key" placeholder="devkey" value="devkey">
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- WAN -->
+            <div class="card" style="margin-top: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>🌐 Configuración WAN</h2>
+                    <button type="button" id="add_wan_btn" class="add-interface-btn" onclick="addWanInterface()">
+                        <span>+</span> Agregar WAN
+                    </button>
+                </div>
+
+                <div class="interface-section">
+                    <h3>WAN 1 (Primario)</h3>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>IP Address *</label>
+                            <input type="text" id="wan1_ip" placeholder="203.0.113.10">
+                        </div>
+                        <div class="form-group">
+                            <label>Subnet Mask *</label>
+                            <input type="text" id="wan1_mask" placeholder="255.255.255.252">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>Gateway *</label>
+                            <input type="text" id="wan1_gw" placeholder="203.0.113.9">
+                        </div>
+                        <div class="form-group">
+                            <label>Bandwidth (Mbps)</label>
+                            <input type="number" id="wan1_bw" value="100">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>ISP Name</label>
+                        <input type="text" id="wan1_isp" placeholder="ISP-Primary">
+                    </div>
+                </div>
+
+                <!-- ... WAN 2, 3, 4 Sections (Assuming similar structure, simplified for brevity in replacement) ... -->
+                <div id="wan2_section" class="interface-section hidden">
+                    <h3>WAN 2 (Secundario)</h3>
+                    <div class="row">
+                        <div class="form-group"><label>IP Address</label><input type="text" id="wan2_ip"
+                                placeholder="198.51.100.10"></div>
+                        <div class="form-group"><label>Subnet Mask</label><input type="text" id="wan2_mask"
+                                placeholder="255.255.255.252"></div>
+                    </div>
+                    <div class="row">
+                        <div class="form-group"><label>Gateway</label><input type="text" id="wan2_gw"
+                                placeholder="198.51.100.9"></div>
+                        <div class="form-group"><label>Bandwidth (Mbps)</label><input type="number" id="wan2_bw"
+                                value="50"></div>
+                    </div>
+                    <div class="form-group"><label>ISP Name</label><input type="text" id="wan2_isp"
+                            placeholder="ISP-Backup"></div>
+                </div>
+
+                <div id="wan3_section" class="interface-section hidden">
+                    <h3>WAN 3 (Opcional)</h3>
+                    <div class="row">
+                        <div class="form-group"><label>IP Address</label><input type="text" id="wan3_ip"
+                                placeholder="10.0.0.10"></div>
+                        <div class="form-group"><label>Subnet Mask</label><input type="text" id="wan3_mask"
+                                placeholder="255.255.255.0"></div>
+                    </div>
+                    <div class="row">
+                        <div class="form-group"><label>Gateway</label><input type="text" id="wan3_gw"
+                                placeholder="10.0.0.1"></div>
+                        <div class="form-group"><label>Bandwidth (Mbps)</label><input type="number" id="wan3_bw"
+                                value="50"></div>
+                    </div>
+                    <div class="form-group"><label>ISP Name</label><input type="text" id="wan3_isp"
+                            placeholder="ISP-WAN3"></div>
+                </div>
+
+                <div id="wan4_section" class="interface-section hidden">
+                    <h3>WAN 4 (Opcional)</h3>
+                    <div class="row">
+                        <div class="form-group"><label>IP Address</label><input type="text" id="wan4_ip"
+                                placeholder="10.0.1.10"></div>
+                        <div class="form-group"><label>Subnet Mask</label><input type="text" id="wan4_mask"
+                                placeholder="255.255.255.0"></div>
+                    </div>
+                    <div class="row">
+                        <div class="form-group"><label>Gateway</label><input type="text" id="wan4_gw"
+                                placeholder="10.0.1.1"></div>
+                        <div class="form-group"><label>Bandwidth (Mbps)</label><input type="number" id="wan4_bw"
+                                value="50"></div>
+                    </div>
+                    <div class="form-group"><label>ISP Name</label><input type="text" id="wan4_isp"
+                            placeholder="ISP-WAN4"></div>
+                </div>
+            </div>
+
+
+            <!-- LAN -->
+            <div class="card" style="margin-top: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>🏠 Configuración LAN</h2>
+                    <button type="button" id="add_lan_btn" class="add-interface-btn" onclick="addLanInterface()">
+                        <span>+</span> Agregar LAN
+                    </button>
+                </div>
+
+                <div id="lan1_section" class="interface-section">
+                    <h3>LAN 1 / VLAN</h3>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>IP Address *</label>
+                            <input type="text" id="lan1_ip" placeholder="192.168.1.1">
+                        </div>
+                        <div class="form-group">
+                            <label>Subnet Mask *</label>
+                            <input type="text" id="lan1_mask" placeholder="255.255.255.0">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="form-group">
+                            <label>VLAN ID</label>
+                            <input type="number" id="lan1_vlan" placeholder="10">
+                        </div>
+                        <div class="form-group">
+                            <label>VLAN Name</label>
+                            <input type="text" id="lan1_vlan_name" placeholder="Data">
+                        </div>
+                    </div>
+                    <div class="checkbox-group form-group">
+                        <input type="checkbox" id="lan1_dhcp_enabled" checked>
+                        <label for="lan1_dhcp_enabled">Habilitar DHCP Server</label>
+                    </div>
+                    <div class="row" id="lan1_dhcp_range">
+                        <div class="form-group">
+                            <label>DHCP Range Start</label>
+                            <input type="text" id="lan1_dhcp_start" placeholder="192.168.1.100">
+                        </div>
+                        <div class="form-group">
+                            <label>DHCP Range End</label>
+                            <input type="text" id="lan1_dhcp_end" placeholder="192.168.1.200">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional LANs (Simplified for replacement) -->
+                <div id="lan2_section" class="interface-section hidden">
+                    <h3>LAN 2 / VLAN</h3>
+                    <div class="row">
+                        <div class="form-group"><label>IP Address</label><input type="text" id="lan2_ip"
+                                placeholder="192.168.2.1"></div>
+                        <div class="form-group"><label>Subnet Mask</label><input type="text" id="lan2_mask"
+                                placeholder="255.255.255.0"></div>
+                    </div>
+                    <div class="row">
+                        <div class="form-group"><label>VLAN ID</label><input type="number" id="lan2_vlan"
+                                placeholder="20"></div>
+                        <div class="form-group"><label>VLAN Name</label><input type="text" id="lan2_vlan_name"
+                                placeholder="Voice"></div>
+                    </div>
+                </div>
+                <div id="lan3_section" class="interface-section hidden">
+                    <h3>LAN 3 / VLAN</h3>
+                    <div class="row">
+                        <div class="form-group"><label>IP Address</label><input type="text" id="lan3_ip"
+                                placeholder="192.168.3.1"></div>
+                        <div class="form-group"><label>Subnet Mask</label><input type="text" id="lan3_mask"
+                                placeholder="255.255.255.0"></div>
+                    </div>
+                    <div class="row">
+                        <div class="form-group"><label>VLAN ID</label><input type="number" id="lan3_vlan"
+                                placeholder="30"></div>
+                        <div class="form-group"><label>VLAN Name</label><input type="text" id="lan3_vlan_name"
+                                placeholder="Guest"></div>
+                    </div>
+                </div>
+                <div id="lan4_section" class="interface-section hidden">
+                    <h3>LAN 4 / VLAN</h3>
+                    <div class="row">
+                        <div class="form-group"><label>IP Address</label><input type="text" id="lan4_ip"
+                                placeholder="192.168.4.1"></div>
+                        <div class="form-group"><label>Subnet Mask</label><input type="text" id="lan4_mask"
+                                placeholder="255.255.255.0"></div>
+                    </div>
+                    <div class="row">
+                        <div class="form-group"><label>VLAN ID</label><input type="number" id="lan4_vlan"
+                                placeholder="40"></div>
+                        <div class="form-group"><label>VLAN Name</label><input type="text" id="lan4_vlan_name"
+                                placeholder="IoT"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Services -->
+            <div class="card" style="margin-top: 1rem;">
+                <h2>⚙️ Servicios</h2>
+                <div class="row">
+                    <div class="form-group">
+                        <label>DNS Primary</label>
+                        <input type="text" id="dns1" value="8.8.8.8">
+                    </div>
+                    <div class="form-group">
+                        <label>DNS Secondary</label>
+                        <input type="text" id="dns2" value="8.8.4.4">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>NTP Server</label>
+                    <input type="text" id="ntp" value="pool.ntp.org">
+                </div>
+            </div>
+
+            <!-- Whitelist -->
+            <div class="card" style="margin-top: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>📝 Whitelist / Direcciones</h2>
+                    <button type="button" class="add-interface-btn" onclick="addDynamicRow('whitelist_container')">
+                        <span>+</span> Agregar
+                    </button>
+                </div>
+                <div id="whitelist_container">
+                    <!-- Rows added here -->
+                </div>
+            </div>
+
+            <!-- Custom Policies -->
+            <div class="card" style="margin-top: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>🛡️ Políticas Personalizadas</h2>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-success" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;"
+                            onclick="updatePolicySelectors()">
+                            🔄 Sincronizar Interfaces
+                        </button>
+                        <button type="button" class="add-interface-btn" onclick="addPolicyRow()">
+                            <span>+</span> Agregar Regla
+                        </button>
+                    </div>
+                </div>
+                <div id="policies_container" style="overflow-x: auto;">
+                    <!-- Policy headers -->
+                    <div class="dynamic-row-policy" style="font-size: 0.7rem; font-weight: bold; margin-bottom: 5px;">
+                        <div>Nombre</div>
+                        <div>Origen (Interface)</div>
+                        <div>Destino (Interface)</div>
+                        <div>Src Addr</div>
+                        <div>Dst Addr</div>
+                        <div>Acción</div>
+                        <div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SD-WAN Health Checks -->
+            <div class="card" style="margin-top: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>💓 SD-WAN Health Checks</h2>
+                    <button type="button" class="add-interface-btn" onclick="addHealthCheckRow()">
+                        <span>+</span> Agregar
+                    </button>
+                </div>
+                <div id="health_checks_container">
+                    <!-- Rows added here -->
+                </div>
+            </div>
+
+            <div class="btn-group" style="margin-top: 2rem; display: flex; justify-content: center; gap: 2rem;">
+                <button class="btn btn-primary" onclick="generateConfig()"
+                    style="font-size: 1.2rem; padding: 1rem 3rem;">
+                    🚀 Generar Configuración
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- The Result Modal -->
+    <div id="resultModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📄 Configuración Generada</h2>
+                <span class="close" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <pre id="modal-output">Generando...</pre>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success" onclick="copyToClipboard()">📋 Copiar</button>
+                <button class="btn btn-primary" onclick="downloadConfig()">📥 Descargar Archivo</button>
             </div>
         </div>
     </div>
@@ -772,6 +815,40 @@
     </div>
 
     <script>
+        // Modal Logic
+        const modal = document.getElementById("resultModal");
+
+        function openModal(content) {
+            const output = document.getElementById("modal-output");
+            if (typeof content === 'object') {
+                output.textContent = JSON.stringify(content, null, 2);
+            } else {
+                output.textContent = content;
+            }
+            modal.style.display = "block";
+        }
+
+        function closeModal() {
+            modal.style.display = "none";
+        }
+
+        // Close on outside click
+        window.onclick = function (event) {
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        function copyToClipboard() {
+            const text = document.getElementById("modal-output").textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                showAlert("Copiado al portapapeles!", "success");
+            }).catch(err => {
+                showAlert("Error al copiar: " + err, "error");
+            });
+        }
+
+        // --- Existing Logic ---
         let catalogData = {};
 
         async function fetchCatalog() {
@@ -1098,11 +1175,8 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    if (typeof result.config === 'object') {
-                        document.getElementById('output').textContent = JSON.stringify(result.config, null, 2);
-                    } else {
-                        document.getElementById('output').textContent = result.config;
-                    }
+                    // Open Modal with Content
+                    openModal(result.content);
 
                     if (result.warnings && result.warnings.length > 0) {
                         showAlert('Advertencias: ' + result.warnings.join(', '), 'warning');
@@ -1111,7 +1185,6 @@
                     }
                 } else {
                     const errorMsg = result.errors ? result.errors.join('\n') : (result.error || 'Error desconocido');
-                    document.getElementById('output').textContent = 'Error: ' + errorMsg;
                     showAlert('Error: ' + errorMsg, 'error');
                 }
             } catch (error) {
@@ -1175,6 +1248,7 @@
             }
         });
     </script>
+    <script src="/static/js/chat.js"></script>
 </body>
 
 </html>
