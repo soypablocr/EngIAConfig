@@ -19,41 +19,64 @@ def test_magic_fill():
     
     print(f"Testing Magic Fill with prompt: '{prompt}'")
     try:
-        response = requests.post(API_URL, headers=headers, json=payload)
+        session = requests.Session()
         
-        if response.status_code == 200:
+        # 1. Login
+        login_response = session.post("http://localhost:5005/login", 
+                                    data={"username": "admin", "password": "admin"},
+                                    allow_redirects=False)
+        
+        if login_response.status_code not in [200, 302]:
+            print(f"[FAIL] Login failed: {login_response.status_code}")
+            return
+            
+        print("[OK] Login successful (Session created)")
+
+        # 2. Magic Fill
+        response = session.post(API_URL, headers=headers, json=payload)
+        
+        print(f"Status Code: {response.status_code}")
+        
+        try:
             data = response.json()
+        except json.JSONDecodeError:
+            print("ERROR: Response is not valid JSON")
+            print("Raw Response Text:")
+            print(response.text)
+            return
+
+        if response.status_code == 200:
             if data.get("success"):
-                print("\n✅ Magic Fill Successful!")
+                print("\n[OK] Magic Fill Successful!")
                 print("Generated Config:")
                 print(json.dumps(data["config"], indent=2))
                 
                 # Basic Validation
                 config = data["config"]
                 if config.get("device", {}).get("vendor") == "fortinet":
-                    print("✅ Vendor correctly inferred as Fortinet")
+                    print("[OK] Vendor correctly inferred as Fortinet")
                 else:
-                    print("❌ Vendor inference failed")
+                    print("[FAIL] Vendor inference failed")
                     
                 if len(config.get("wan_interfaces", [])) >= 2:
-                    print("✅ Created multiple WANs")
+                    print("[OK] Created multiple WANs")
                 else:
-                    print("❌ Failed to create multiple WANs")
+                    print("[FAIL] Failed to create multiple WANs")
                     
                 lans = config.get("lan_interfaces", [])
                 guest_vlan = next((l for l in lans if l.get("vlan_id") == 20), None)
                 if guest_vlan:
-                    print("✅ Guest VLAN 20 found")
+                    print("[OK] Guest VLAN 20 found")
                 else:
-                    print("❌ Guest VLAN 20 not found")
+                    print("[FAIL] Guest VLAN 20 not found")
             else:
-                print(f"❌ API returned success=false: {data}")
+                print(f"[FAIL] API returned success=false: {data}")
         else:
-            print(f"❌ Request failed with status code {response.status_code}")
+            print(f"[FAIL] Request failed with status code {response.status_code}")
             print(response.text)
             
     except Exception as e:
-        print(f"❌ Exception during test: {e}")
+        print(f"[ERROR] Exception during test: {e}")
 
 if __name__ == "__main__":
     test_magic_fill()

@@ -48,6 +48,11 @@ class ChatAgent:
                 # Check for Rate Limit (429)
                 if "429" in str(e):
                     return "I'm currently experiencing high traffic (Rate Limit Exceeded). Please try again in a minute."
+                
+                # Check for Leaked/Invalid Key (403)
+                if "403" in str(e) or "leaked" in str(e).lower():
+                    return "ERROR: The API Key is invalid or has been revoked. Please check your GEMINI_API_KEY environment variable."
+
                 print(f"ERROR: Gemini API call failed: {e}. Falling back to rules.")
 
         # Fallback to Rule-Based Logic

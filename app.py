@@ -11,11 +11,21 @@ from functools import wraps
 
 app = Flask(__name__)
 generator = NetworkConfigGenerator()
+
+# Load .env file manually (minimal dependency)
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(env_path):
+    with open(env_path) as f:
+        for line in f:
+            if line.strip() and not line.startswith('#'):
+                key, value = line.strip().split('=', 1)
+                os.environ[key] = value
+
 # Minimal Security
 API_KEY = os.environ.get("ENGIA_API_KEY")
 
 # Initialize Chat Agent with LLM Key
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBXztlBxZaOJz_MAK7erf20gYi0mEaiv-g") # Fallback to provided key if env var not set
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY") 
 chat_agent = ChatAgent(api_key=GEMINI_KEY)
 
 # Authentication Config
