@@ -415,6 +415,12 @@
 <body>
     <div class="container">
         <div style="position: absolute; top: 1rem; right: 1rem; display: flex; gap: 1rem;">
+            {% if session.get('is_admin') %}
+            <a href="/admin/users"
+                style="color: var(--primary); text-decoration: none; border: 1px solid var(--primary); padding: 0.5rem 1rem; border-radius: 20px; transition: all 0.3s; font-size: 0.9rem; background: rgba(197, 160, 89, 0.1);">
+                👥 Usuarios
+            </a>
+            {% endif %}
             <a href="/admin/logs"
                 style="color: var(--text-muted); text-decoration: none; border: 1px solid var(--glass-border); padding: 0.5rem 1rem; border-radius: 20px; transition: all 0.3s; font-size: 0.9rem; background: rgba(0,0,0,0.3);">
                 📜 Logs
@@ -739,17 +745,45 @@
                         </div>
                     </div>
                     <div class="checkbox-group form-group">
-                        <input type="checkbox" id="lan1_dhcp_enabled" checked>
+                        <input type="checkbox" id="lan1_dhcp_enabled">
                         <label for="lan1_dhcp_enabled">Habilitar DHCP Server</label>
                     </div>
-                    <div class="row" id="lan1_dhcp_range">
-                        <div class="form-group">
-                            <label>DHCP Range Start</label>
-                            <input type="text" id="lan1_dhcp_start" placeholder="192.168.1.100">
+                    <div id="lan1_dhcp_range" style="display: none;">
+                        <div class="row">
+                            <div class="form-group">
+                                <label>DHCP Range Start <span style="color:var(--error)">*</span></label>
+                                <input type="text" id="lan1_dhcp_start" placeholder="192.168.1.100">
+                                <small class="error-msg" style="display:none; color:var(--error)">Requerido</small>
+                            </div>
+                            <div class="form-group">
+                                <label>DHCP Range End <span style="color:var(--error)">*</span></label>
+                                <input type="text" id="lan1_dhcp_end" placeholder="192.168.1.200">
+                                <small class="error-msg" style="display:none; color:var(--error)">Requerido</small>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>Default Gateway (Opcional)</label>
+                                <input type="text" id="lan1_dhcp_gateway" placeholder="Same as Interface IP">
+                            </div>
+                            <div class="form-group">
+                                <label>Lease Time (seg)</label>
+                                <input type="number" id="lan1_dhcp_lease" value="86400">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group">
+                                <label>DNS 1 (Custom)</label>
+                                <input type="text" id="lan1_dhcp_dns1" placeholder="8.8.8.8">
+                            </div>
+                            <div class="form-group">
+                                <label>DNS 2 (Custom)</label>
+                                <input type="text" id="lan1_dhcp_dns2" placeholder="8.8.4.4">
+                            </div>
                         </div>
                         <div class="form-group">
-                            <label>DHCP Range End</label>
-                            <input type="text" id="lan1_dhcp_end" placeholder="192.168.1.200">
+                            <label>Opciones Adicionales (Raw)</label>
+                            <input type="text" id="lan1_dhcp_options" placeholder="Option 43, Option 150...">
                         </div>
                     </div>
                 </div>
@@ -769,6 +803,37 @@
                         <div class="form-group"><label>VLAN Name</label><input type="text" id="lan2_vlan_name"
                                 placeholder="Voice"></div>
                     </div>
+                    <!-- DHCP LAN 2 -->
+                    <div class="checkbox-group form-group">
+                        <input type="checkbox" id="lan2_dhcp_enabled">
+                        <label for="lan2_dhcp_enabled">Habilitar DHCP Server</label>
+                    </div>
+                    <div id="lan2_dhcp_range" style="display: none;">
+                        <div class="row">
+                            <div class="form-group">
+                                <label>DHCP Range Start</label>
+                                <input type="text" id="lan2_dhcp_start" placeholder="192.168.2.100">
+                            </div>
+                            <div class="form-group">
+                                <label>DHCP Range End</label>
+                                <input type="text" id="lan2_dhcp_end" placeholder="192.168.2.200">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group"><label>Default Gateway</label><input type="text"
+                                    id="lan2_dhcp_gateway" placeholder="Same as IP"></div>
+                            <div class="form-group"><label>Lease Time</label><input type="number" id="lan2_dhcp_lease"
+                                    value="86400"></div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group"><label>DNS 1</label><input type="text" id="lan2_dhcp_dns1"
+                                    placeholder="8.8.8.8"></div>
+                            <div class="form-group"><label>DNS 2</label><input type="text" id="lan2_dhcp_dns2"
+                                    placeholder="8.8.4.4"></div>
+                        </div>
+                        <div class="form-group"><label>Opciones</label><input type="text" id="lan2_dhcp_options"
+                                placeholder="Option 43..."></div>
+                    </div>
                 </div>
                 <div id="lan3_section" class="interface-section hidden">
                     <h3>LAN 3 / VLAN</h3>
@@ -784,6 +849,33 @@
                         <div class="form-group"><label>VLAN Name</label><input type="text" id="lan3_vlan_name"
                                 placeholder="Guest"></div>
                     </div>
+                    <!-- DHCP LAN 3 -->
+                    <div class="checkbox-group form-group">
+                        <input type="checkbox" id="lan3_dhcp_enabled">
+                        <label for="lan3_dhcp_enabled">Habilitar DHCP Server</label>
+                    </div>
+                    <div id="lan3_dhcp_range" style="display: none;">
+                        <div class="row">
+                            <div class="form-group"><label>DHCP Range Start</label><input type="text"
+                                    id="lan3_dhcp_start" placeholder="192.168.3.100"></div>
+                            <div class="form-group"><label>DHCP Range End</label><input type="text" id="lan3_dhcp_end"
+                                    placeholder="192.168.3.200"></div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group"><label>Default Gateway</label><input type="text"
+                                    id="lan3_dhcp_gateway" placeholder="Same as IP"></div>
+                            <div class="form-group"><label>Lease Time</label><input type="number" id="lan3_dhcp_lease"
+                                    value="86400"></div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group"><label>DNS 1</label><input type="text" id="lan3_dhcp_dns1"
+                                    placeholder="8.8.8.8"></div>
+                            <div class="form-group"><label>DNS 2</label><input type="text" id="lan3_dhcp_dns2"
+                                    placeholder="8.8.4.4"></div>
+                        </div>
+                        <div class="form-group"><label>Opciones</label><input type="text" id="lan3_dhcp_options"
+                                placeholder="Option 43..."></div>
+                    </div>
                 </div>
                 <div id="lan4_section" class="interface-section hidden">
                     <h3>LAN 4 / VLAN</h3>
@@ -798,6 +890,33 @@
                                 placeholder="40"></div>
                         <div class="form-group"><label>VLAN Name</label><input type="text" id="lan4_vlan_name"
                                 placeholder="IoT"></div>
+                    </div>
+                    <!-- DHCP LAN 4 -->
+                    <div class="checkbox-group form-group">
+                        <input type="checkbox" id="lan4_dhcp_enabled">
+                        <label for="lan4_dhcp_enabled">Habilitar DHCP Server</label>
+                    </div>
+                    <div id="lan4_dhcp_range" style="display: none;">
+                        <div class="row">
+                            <div class="form-group"><label>DHCP Range Start</label><input type="text"
+                                    id="lan4_dhcp_start" placeholder="192.168.4.100"></div>
+                            <div class="form-group"><label>DHCP Range End</label><input type="text" id="lan4_dhcp_end"
+                                    placeholder="192.168.4.200"></div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group"><label>Default Gateway</label><input type="text"
+                                    id="lan4_dhcp_gateway" placeholder="Same as IP"></div>
+                            <div class="form-group"><label>Lease Time</label><input type="number" id="lan4_dhcp_lease"
+                                    value="86400"></div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group"><label>DNS 1</label><input type="text" id="lan4_dhcp_dns1"
+                                    placeholder="8.8.8.8"></div>
+                            <div class="form-group"><label>DNS 2</label><input type="text" id="lan4_dhcp_dns2"
+                                    placeholder="8.8.4.4"></div>
+                        </div>
+                        <div class="form-group"><label>Opciones</label><input type="text" id="lan4_dhcp_options"
+                                placeholder="Option 43..."></div>
                     </div>
                 </div>
             </div>
@@ -1082,7 +1201,16 @@
 
                     const dhcpCheck = document.getElementById(`lan${i}_dhcp_enabled`);
                     if (dhcpCheck) {
-                        dhcpCheck.checked = lan.dhcp_enabled !== false; // Default true
+                        dhcpCheck.checked = lan.dhcp_enabled === true; // Default false now
+
+                        if (lan.dhcp_range_start) document.getElementById(`lan${i}_dhcp_start`).value = lan.dhcp_range_start;
+                        if (lan.dhcp_range_end) document.getElementById(`lan${i}_dhcp_end`).value = lan.dhcp_range_end;
+                        if (lan.dhcp_gateway) document.getElementById(`lan${i}_dhcp_gateway`).value = lan.dhcp_gateway;
+                        if (lan.dhcp_lease_time) document.getElementById(`lan${i}_dhcp_lease`).value = lan.dhcp_lease_time;
+                        if (lan.dhcp_dns1) document.getElementById(`lan${i}_dhcp_dns1`).value = lan.dhcp_dns1;
+                        if (lan.dhcp_dns2) document.getElementById(`lan${i}_dhcp_dns2`).value = lan.dhcp_dns2;
+                        if (lan.dhcp_options) document.getElementById(`lan${i}_dhcp_options`).value = lan.dhcp_options;
+
                         // Trigger change to show/hide range
                         dhcpCheck.dispatchEvent(new Event('change', { 'bubbles': true }));
                     }
@@ -1243,8 +1371,13 @@
                         vlan_id: parseInt(document.getElementById(`lan${i}_vlan`).value) || null,
                         vlan_name: document.getElementById(`lan${i}_vlan_name`).value || (i === 1 ? 'LAN' : `VLAN${i}`),
                         dhcp_enabled: dhcpEnabledCheck ? dhcpEnabledCheck.checked : false,
-                        dhcp_range_start: (dhcpStartInput && dhcpStartInput.value) ? dhcpStartInput.value : null,
-                        dhcp_range_end: (dhcpEndInput && dhcpEndInput.value) ? dhcpEndInput.value : null
+                        dhcp_range_start: document.getElementById(`lan${i}_dhcp_start`)?.value || null,
+                        dhcp_range_end: document.getElementById(`lan${i}_dhcp_end`)?.value || null,
+                        dhcp_gateway: document.getElementById(`lan${i}_dhcp_gateway`)?.value || null,
+                        dhcp_lease_time: parseInt(document.getElementById(`lan${i}_dhcp_lease`)?.value) || 86400,
+                        dhcp_dns1: document.getElementById(`lan${i}_dhcp_dns1`)?.value || null,
+                        dhcp_dns2: document.getElementById(`lan${i}_dhcp_dns2`)?.value || null,
+                        dhcp_options: document.getElementById(`lan${i}_dhcp_options`)?.value || null
                     });
                 }
             }
@@ -1438,7 +1571,38 @@
             }
         }
 
+        function validateDhcp() {
+            let valid = true;
+            for (let i = 1; i <= 4; i++) {
+                const dhcpEnabled = document.getElementById(`lan${i}_dhcp_enabled`);
+                if (dhcpEnabled && dhcpEnabled.checked) {
+                    const start = document.getElementById(`lan${i}_dhcp_start`);
+                    const end = document.getElementById(`lan${i}_dhcp_end`);
+                    // Find error msg logic: sibling or precise query
+                    const startMsg = start.parentElement.querySelector('.error-msg');
+                    const endMsg = end.parentElement.querySelector('.error-msg');
+
+                    if (!start.value.trim()) {
+                        if (startMsg) startMsg.style.display = 'block';
+                        valid = false;
+                    } else {
+                        if (startMsg) startMsg.style.display = 'none';
+                    }
+
+                    if (!end.value.trim()) {
+                        if (endMsg) endMsg.style.display = 'block';
+                        valid = false;
+                    } else {
+                        if (endMsg) endMsg.style.display = 'none';
+                    }
+                }
+            }
+            if (!valid) showAlert("Por favor complete los campos obligatorios de DHCP.", "error");
+            return valid;
+        }
+
         async function generateConfig() {
+            if (!validateDhcp()) return;
             const data = getFormData();
 
             try {

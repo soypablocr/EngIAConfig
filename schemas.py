@@ -91,6 +91,11 @@ class LanInterface(BaseModel):
     dhcp_enabled: bool = False
     dhcp_range_start: EmptyStrToNoneIP = None
     dhcp_range_end: EmptyStrToNoneIP = None
+    dhcp_gateway: EmptyStrToNoneIP = None
+    dhcp_lease_time: Optional[int] = 86400
+    dhcp_dns1: EmptyStrToNoneIP = None
+    dhcp_dns2: EmptyStrToNoneIP = None
+    dhcp_options: Optional[str] = None
 
     @field_validator('subnet_mask')
     @classmethod

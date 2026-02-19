@@ -31,13 +31,16 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# --- Audit Log System ---
+from werkzeug.security import generate_password_hash, check_password_hash
+
+# --- Audit Log System & User Management ---
 DB_NAME = "audit.db"
 
 def init_db():
     try:
         with sqlite3.connect(DB_NAME) as conn:
             cursor = conn.cursor()
+            # Audit Logs
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,6 +50,27 @@ def init_db():
                     details TEXT
                 )
             ''')
+            # Users Table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    is_authorized INTEGER DEFAULT 0,
+                    is_admin INTEGER DEFAULT 0,
+                    created_at TEXT
+                )
+            ''')
+            
+            # Seed Admin User if table is empty
+            cursor.execute('SELECT COUNT(*) FROM users')
+            if cursor.fetchone()[0] == 0:
+                print(f"Seeding admin user: {ADMIN_USER}")
+                hashed_pw = generate_password_hash(ADMIN_PASSWORD)
+                cursor.execute(
+                    "INSERT INTO users (username, password_hash, is_authorized, is_admin, created_at) VALUES (?, ?, 1, 1, ?)",
+                    (ADMIN_USER, hashed_pw, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                )
             conn.commit()
     except Exception as e:
         print(f"DB Init Error: {e}")
@@ -74,19 +98,85 @@ def require_api_key(f):
     decorated.__name__ = f.__name__
     return decorated
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+        
+        if not username or not password:
+            flash('Usuario y contraseña requeridos', 'error')
+            return redirect(url_for('register'))
+            
+        if password != confirm_password:
+            flash('Las contraseñas no coinciden', 'error')
+            return redirect(url_for('register'))
+            
+        try:
+            with sqlite3.connect(DB_NAME) as conn:
+                cursor = conn.cursor()
+                # Check if user exists
+                cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+                if cursor.fetchone():
+                    flash('El usuario ya existe', 'error')
+                    return redirect(url_for('register'))
+                
+                # Create user
+                hashed_pw = generate_password_hash(password)
+                cursor.execute(
+                    "INSERT INTO users (username, password_hash, is_authorized, created_at) VALUES (?, ?, 0, ?)",
+                    (username, hashed_pw, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                )
+                conn.commit()
+                
+                log_action(username, "REGISTER", "New user registered")
+                flash('Cuenta creada exitosamente. Esperando aprobación del administrador.', 'success')
+                return redirect(url_for('login'))
+                
+        except Exception as e:
+            flash(f'Error registrando usuario: {e}', 'error')
+            return redirect(url_for('register'))
+            
+    return render_template('register.html')
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
         
+        # 1. Check Hardcoded Admin (Always Authorized)
         if username == ADMIN_USER and password == ADMIN_PASSWORD:
             session['user'] = username
-            log_action(username, "LOGIN", "User logged in successfully")
+            session['is_admin'] = True # Mark as super admin
+            log_action(username, "LOGIN", "Admin logged in successfully")
             return redirect(url_for('index'))
-        else:
-            log_action(username or "unknown", "LOGIN_FAILED", "Invalid credentials")
-            flash('Credenciales incorrectas', 'error')
+            
+        # 2. Check Database Users
+        try:
+            with sqlite3.connect(DB_NAME) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+                user = cursor.fetchone()
+                
+                if user and check_password_hash(user['password_hash'], password):
+                    if user['is_authorized']:
+                        session['user'] = username
+                        session['is_admin'] = bool(user['is_admin'])
+                        log_action(username, "LOGIN", "User logged in successfully")
+                        return redirect(url_for('index'))
+                    else:
+                        log_action(username, "LOGIN_FAILED", "User not authorized")
+                        flash('Tu cuenta está pendiente de aprobación por el administrador.', 'warning')
+                        return render_template('login.html')
+                        
+                log_action(username or "unknown", "LOGIN_FAILED", "Invalid credentials")
+                flash('Credenciales incorrectas', 'error')
+                
+        except Exception as e:
+            flash(f'Error de sistema: {e}', 'error')
             
     return render_template('login.html')
 
@@ -100,6 +190,10 @@ def logout():
 @app.route('/admin/logs')
 @login_required
 def view_logs():
+    if not session.get('is_admin'):
+        flash('Acceso denegado', 'error')
+        return redirect(url_for('index'))
+        
     try:
         with sqlite3.connect(DB_NAME) as conn:
             conn.row_factory = sqlite3.Row
@@ -109,6 +203,46 @@ def view_logs():
         return render_template('logs.html', logs=logs)
     except Exception as e:
         return f"Error accessing logs: {e}"
+
+@app.route('/admin/users', methods=['GET', 'POST'])
+@login_required
+def manage_users():
+    if not session.get('is_admin'):
+        flash('Acceso denegado', 'error')
+        return redirect(url_for('index'))
+        
+    if request.method == 'POST':
+        action = request.form.get('action')
+        user_id = request.form.get('user_id')
+        
+        try:
+            with sqlite3.connect(DB_NAME) as conn:
+                cursor = conn.cursor()
+                
+                if action == 'approve':
+                    cursor.execute("UPDATE users SET is_authorized = 1 WHERE id = ?", (user_id,))
+                    log_action(session.get('user'), "APPROVE_USER", f"Approved user ID {user_id}")
+                    flash('Usuario autorizado', 'success')
+                    
+                elif action == 'delete':
+                    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+                    log_action(session.get('user'), "DELETE_USER", f"Deleted user ID {user_id}")
+                    flash('Usuario eliminado', 'success')
+                    
+                conn.commit()
+        except Exception as e:
+            flash(f'Error: {e}', 'error')
+            
+    # GET: List users
+    try:
+        with sqlite3.connect(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM users ORDER BY created_at DESC")
+            users = cursor.fetchall()
+        return render_template('users.html', users=users)
+    except Exception as e:
+        return f"Error accessing users: {e}"
 
 @app.route('/')
 @login_required

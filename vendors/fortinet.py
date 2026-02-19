@@ -208,23 +208,45 @@ end
             
             # DHCP Server
             if lan.dhcp_enabled:
-                dns_list = getattr(self.params.services, 'dns_servers', []) if self.params.services else []
-                dns1 = dns_list[0] if dns_list else "8.8.8.8"
+                # DNS logic
+                dns1 = lan.dhcp_dns1
+                if not dns1:
+                    dns_list = getattr(self.params.services, 'dns_servers', []) if self.params.services else []
+                    dns1 = dns_list[0] if dns_list else "8.8.8.8"
                 
+                dns2_cmd = ""
+                if lan.dhcp_dns2:
+                    dns2_cmd = f"        set dns-server2 {lan.dhcp_dns2}"
+                elif getattr(self.params.services, 'dns_servers', []) and len(self.params.services.dns_servers) > 1:
+                     dns2_cmd = f"        set dns-server2 {self.params.services.dns_servers[1]}"
+
+                # Gateway logic
+                gateway = lan.dhcp_gateway if lan.dhcp_gateway else lan.ip_address
+
+                # Lease time
+                lease_time = lan.dhcp_lease_time if lan.dhcp_lease_time else 86400
+
+                # Options (Simple comment for now as raw options require parsing)
+                options_cmd = ""
+                if lan.dhcp_options:
+                    options_cmd = f"        # Custom Options: {lan.dhcp_options}"
+
                 config += f'''
 config system dhcp server
     edit {dhcp_id}
         set interface "{iface}"
-        set default-gateway {lan.ip_address}
+        set default-gateway {gateway}
         set netmask {lan.subnet_mask}
         set dns-server1 {dns1}
-        set lease-time 86400
+{dns2_cmd}
+        set lease-time {lease_time}
         config ip-range
             edit 1
                 set start-ip {lan.dhcp_range_start}
                 set end-ip {lan.dhcp_range_end}
             next
         end
+{options_cmd}
     next
 end
 '''

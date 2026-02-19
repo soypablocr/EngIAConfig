@@ -109,7 +109,9 @@ class ChatAgent:
             "lan_interfaces": [
                 { 
                     "interface_name": "lan", "ip_address": "192.168.1.1", "subnet_mask": "255.255.255.0", 
-                    "vlan_id": null, "vlan_name": "LAN", "dhcp_enabled": true 
+                    "vlan_id": null, "vlan_name": "LAN", "dhcp_enabled": true,
+                    "dhcp_range_start": "192.168.1.100", "dhcp_range_end": "192.168.1.200",
+                    "dhcp_gateway": "192.168.1.1", "dhcp_dns1": "8.8.8.8", "dhcp_lease_time": 86400
                 }
             ],
             "services": { "dns_servers": ["8.8.8.8"], "ntp_servers": ["pool.ntp.org"] },
@@ -124,6 +126,11 @@ class ChatAgent:
         3. If the user mentions specific IPs, use them. Otherwise, generate realistic example IPs (RFC1918 for LAN, Public for WAN).
         4. Infer the Vendor if possible (e.g. "MX64" -> meraki). Default to "fortinet" if unsure.
         5. The 'explanation' field is MANADATORY. Explain your logic clearly to the user.
+        6. STRICTLY ONLY create the interfaces mentioned by the user. Do NOT create default WAN/LAN interfaces if they are not requested.
+           - If user says "WAN1 and WAN2", create ONLY those two.
+           - If user says nothing about LAN, do NOT create a LAN interface.
+           - If user says nothing about WAN, do NOT create a WAN interface.
+        7. If you must create a default interface because the device requires one to function (e.g. LAN), create ONLY ONE.
         """
 
         try:
