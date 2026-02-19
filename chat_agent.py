@@ -30,6 +30,23 @@ class ChatAgent:
             except Exception as e:
                 print(f"ERROR: Failed to initialize Gemini AI: {e}")
 
+    prompt_injection_terms = ["ignore previous instructions", "system prompt", "you are now"]
+
+    def _sanitize_input(self, text):
+        """Guardrail A: Input Validation & Sanitization"""
+        # 1. Length Check
+        if len(text) > 1000:
+            raise ValueError("Input text too long (max 1000 chars)")
+        
+        # 2. Simple Injection Check (Heuristic)
+        lowered = text.lower()
+        for term in self.prompt_injection_terms:
+            if term in lowered:
+                raise ValueError("Potential prompt injection detected")
+                
+        # 3. Strip control characters
+        return "".join(ch for ch in text if ch.isprintable())
+
     def get_response(self, message, context=None):
         """
         Generates a response to the user's message, taking into account the current form context.
@@ -83,14 +100,21 @@ class ChatAgent:
 
     def extract_config_from_text(self, text):
         """
-        Interprets natural language text and returns a JSON object matching the form structure.
+        Uses the LLM to extract structured configuration from natural language.
+        Includes Guardrail B: Output Validation (JSON Schema)
         """
         if not self.model:
             return {"error": "AI service unavailable. Check API Key."}
 
+        try:
+            # Apply Input Guardrail
+            clean_text = self._sanitize_input(text)
+        except ValueError as ve:
+            return {"error": str(ve)}
+
         # Schema definition for the LLM
         schema_prompt = """
-        You are a Network Configuration Converter. I will give you a natural language description of a network requirement.
+        SYSTEM: You are a Network Configuration Converter. I will give you a natural language description of a network requirement.
         You must convert it into a JSON object that EXACTLY matches this structure (fill missing fields with reasonable defaults or null):
 
         {
@@ -125,7 +149,7 @@ class ChatAgent:
             "explanation": "Brief reasoning for the choices made (e.g. why this model, why these interfaces)."
         }
 
-        Rules:
+        Rules (Guardrail C: System Instructions):
         1. Return ONLY valid JSON. No markdown formatting.
         2. If the user mentions "Guest", create a VLAN (e.g., ID 10) for it on LAN interfaces.
         3. If the user mentions specific IPs, use them. Otherwise, generate realistic example IPs (RFC1918 for LAN, Public for WAN).
@@ -136,10 +160,11 @@ class ChatAgent:
            - If user says nothing about LAN, do NOT create a LAN interface.
            - If user says nothing about WAN, do NOT create a WAN interface.
         7. If you must create a default interface because the device requires one to function (e.g. LAN), create ONLY ONE.
+        8. REFUSE requests unrelated to network configuration.
         """
 
         try:
-            full_prompt = f"{schema_prompt}\n\nUser Description: {text}"
+            full_prompt = f"{schema_prompt}\n\nUser Description: {clean_text}"
             response = self.model.generate_content(full_prompt)
             
             if response and response.text:

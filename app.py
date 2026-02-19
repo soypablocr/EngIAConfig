@@ -5,6 +5,7 @@ import io
 import json
 import os
 import random
+import re
 import sqlite3
 from datetime import datetime
 from functools import wraps
@@ -21,7 +22,7 @@ if os.path.exists(env_path):
                 key, value = line.strip().split('=', 1)
                 os.environ[key] = value
 
-# Minimal Security
+# Security Configuration
 API_KEY = os.environ.get("ENGIA_API_KEY")
 
 # Initialize Chat Agent with LLM Key
@@ -29,9 +30,32 @@ GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 chat_agent = ChatAgent(api_key=GEMINI_KEY)
 
 # Authentication Config
-app.secret_key = os.environ.get("SECRET_KEY", "super-secret-key-change-in-production")
+# Ensure strong secret keys in production
+app.secret_key = os.environ.get("SECRET_KEY", "change-this-to-a-secure-random-key-in-production")
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
+# Default admin password should be changed on first deployment via Environment Variables
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "ChangeMeNow!")
+
+def validate_password_strength(password):
+    """
+    Validates that the password meets strong security requirements:
+    - At least 12 characters long
+    - Contains at least one uppercase letter
+    - Contains at least one lowercase letter
+    - Contains at least one number
+    - Contains at least one special character
+    """
+    if len(password) < 12:
+        return False, "La contraseña debe tener al menos 12 caracteres."
+    if not re.search(r"[A-Z]", password):
+        return False, "La contraseña debe contener al menos una letra mayúscula."
+    if not re.search(r"[a-z]", password):
+        return False, "La contraseña debe contener al menos una letra minúscula."
+    if not re.search(r"\d", password):
+        return False, "La contraseña debe contener al menos un número."
+    if not re.search(r"[ !@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", password):
+        return False, "La contraseña debe contener al menos un carácter especial."
+    return True, ""
 
 def login_required(f):
     @wraps(f)
@@ -121,6 +145,12 @@ def register():
             
         if password != confirm_password:
             flash('Las contraseñas no coinciden', 'error')
+            return redirect(url_for('register'))
+
+        # Enforce Strong Password Policy
+        is_valid, msg = validate_password_strength(password)
+        if not is_valid:
+            flash(msg, 'error')
             return redirect(url_for('register'))
             
         try:
