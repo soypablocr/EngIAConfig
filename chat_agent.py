@@ -1,6 +1,8 @@
 import os
 import json
 import random
+import re
+import requests
 
 class ChatAgent:
     def __init__(self, api_key=None):
@@ -16,17 +18,21 @@ class ChatAgent:
         """
         self.api_key = api_key
         self.model = None
+        
+        # Robustness: Model Versioning & Fallback Configuration
+        self.model_version = os.getenv("MODEL_VERSION", "gemini-flash-latest")
+        self.local_llm_url = os.getenv("LOCAL_LLM_URL", "http://localhost:11434/api/generate")
 
         if self.api_key:
             try:
                 import google.generativeai as genai
                 genai.configure(api_key=self.api_key)
                 
-                # Using a standard model
-                self.model = genai.GenerativeModel('gemini-flash-latest')
-                print("DEBUG: Gemini AI initialized successfully.")
+                # Using a standard model via env var or default
+                self.model = genai.GenerativeModel(self.model_version)
+                print(f"DEBUG: Gemini AI initialized successfully using version: {self.model_version}")
             except ImportError:
-                print("WARNING: google-generativeai not installed. Using rule-based fallback.")
+                print("WARNING: google-generativeai not installed. Fallback modes enabled.")
             except Exception as e:
                 print(f"ERROR: Failed to initialize Gemini AI: {e}")
 
@@ -44,35 +50,75 @@ class ChatAgent:
             if term in lowered:
                 raise ValueError("Potential prompt injection detected")
                 
-        # 3. Strip control characters
+        # 3. Anonymization / Redaction (PII)
+        # Redact IPv4 addresses
+        text = re.sub(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', '[IP_REDACTED]', text)
+        # Redact Email addresses
+        text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL_REDACTED]', text)
+        # Redact potential API Keys (simple heuristic: long alphanumeric strings)
+        text = re.sub(r'\b[A-Za-z0-9]{20,}\b', '[KEY_REDACTED]', text)
+
+        # 4. Strip control characters
         return "".join(ch for ch in text if ch.isprintable())
+
+    def _call_local_llm(self, prompt):
+        """Fallback method to call a local LLM (e.g., Ollama)"""
+        try:
+            print(f"DEBUG: Attempting fallback to local LLM at {self.local_llm_url}")
+            # Ollama API format
+            payload = {
+                "model": "llama3",  # Default local model, could also be env var
+                "prompt": prompt,
+                "stream": False
+            }
+            response = requests.post(self.local_llm_url, json=payload, timeout=10)
+            if response.status_code == 200:
+                return response.json().get('response', 'Error: Empty response from local model')
+            else:
+                return f"Error: Local LLM returned status {response.status_code}"
+        except Exception as e:
+            print(f"ERROR: Local LLM fallback failed: {e}")
+            return None
 
     def get_response(self, message, context=None):
         """
         Generates a response to the user's message, taking into account the current form context.
         """
-        # Try LLM first if available
+        # Sanitize input first
+        try:
+            message = self._sanitize_input(message)
+        except ValueError as e:
+            return f"Security Alert: {str(e)}"
+
+        # Construct prompt
+        context_str = json.dumps(context, indent=2) if context else "No context provided."
+        full_prompt = f"{self.system_prompt}\n\nCurrent Form Context:\n{context_str}\n\nUser Question: {message}"
+
+        # Try Primary LLM (Gemini)
         if self.model:
             try:
-                # Construct prompt with context
-                context_str = json.dumps(context, indent=2) if context else "No context provided."
-                full_prompt = f"{self.system_prompt}\n\nCurrent Form Context:\n{context_str}\n\nUser Question: {message}"
-                
                 response = self.model.generate_content(full_prompt)
                 if response and response.text:
                     return response.text
             except Exception as e:
-                # Check for Rate Limit (429)
+                # Specific Error Handling
                 if "429" in str(e):
-                    return "I'm currently experiencing high traffic (Rate Limit Exceeded). Please try again in a minute."
+                    return "I'm currently experiencing high traffic. Please try again later."
+                if "403" in str(e):
+                    print("ERROR: Invalid API Key.")
                 
-                # Check for Leaked/Invalid Key (403)
-                if "403" in str(e) or "leaked" in str(e).lower():
-                    return "ERROR: The API Key is invalid or has been revoked. Please check your GEMINI_API_KEY environment variable."
+                print(f"ERROR: Gemini API call failed: {e}. Attempting fallback...")
+                # Proceed to fallback below
 
-                print(f"ERROR: Gemini API call failed: {e}. Falling back to rules.")
+        # Try Local LLM Fallback if Primary failed or is not configured
+        local_response = self._call_local_llm(full_prompt)
+        if local_response:
+            return f"{local_response} (Generated via Local Fallback)"
 
-        # Fallback to Rule-Based Logic
+        # Final Fallback to Rule-Based Logic
+        return self._rule_based_fallback(message, context)
+
+    def _rule_based_fallback(self, message, context):
         message = message.lower()
         context = context or {}
         vendor = context.get('vendor', 'Unknown Vendor')
@@ -81,31 +127,21 @@ class ChatAgent:
             return f"Hello! I am your EngIAConfig assistant. I see you are configuring a **{vendor}** device. How can I help you today? (Rule-Based Mode)"
         
         if 'wan' in message:
-            if vendor == 'Fortinet':
-                return "For **Fortinet**, WAN interfaces are typically configured with static IPs or DHCP. In SD-WAN setups, multiple WANs are used for redundancy. Do you need help with SD-WAN rules?"
-            elif vendor == 'Meraki':
-                return "On **Meraki** MX appliances, WAN1 and WAN2 are automatically configured for load balancing or failover. You can set static IPs in the Local Status Page or via the dashboard."
             return "WAN (Wide Area Network) interfaces connect your device to the internet. Please specify if you need Static, DHCP, or PPPoE help."
 
         if 'lan' in message or 'vlan' in message:
-            return "LAN configurations involve setting up local subnets and DHCP servers. You can add multiple VLANs to segregate traffic (e.g., Voice, Guest, Corporate)."
-
-        if 'ip' in message and 'static' in message:
-            return "To configure a Static IP, you'll need the IP Address, Subnet Mask, and Gateway. Make sure these match the details provided by your ISP."
+            return "LAN configurations involve setting up local subnets and DHCP servers. You can add multiple VLANs to segregate traffic."
 
         if 'what is' in message:
              return "I can explain technical terms! For example, 'SD-WAN' stands for Software-Defined Wide Area Network. What term would you like me to define?"
         
-        return "I'm currently running in 'Offline Mode' (Rule-Based) because the AI service is unavailable. To unlock my full capabilities, please check the API Key configuration."
+        return "I'm currently running in 'Offline Mode' (Rule-Based) because AI services are unavailable."
 
     def extract_config_from_text(self, text):
         """
         Uses the LLM to extract structured configuration from natural language.
         Includes Guardrail B: Output Validation (JSON Schema)
         """
-        if not self.model:
-            return {"error": "AI service unavailable. Check API Key."}
-
         try:
             # Apply Input Guardrail
             clean_text = self._sanitize_input(text)
@@ -144,36 +180,50 @@ class ChatAgent:
                 }
             ],
             "services": { "dns_servers": ["8.8.8.8"], "ntp_servers": ["pool.ntp.org"] },
-            "webfilter_categories": [2, 12] (IDs for Pornography/Malware if mentioned),
+            "webfilter_categories": [2, 12],
             "policy_template": "basic|standard|advanced",
-            "explanation": "Brief reasoning for the choices made (e.g. why this model, why these interfaces)."
+            "explanation": "Brief reasoning for the choices made."
         }
 
         Rules (Guardrail C: System Instructions):
         1. Return ONLY valid JSON. No markdown formatting.
-        2. If the user mentions "Guest", create a VLAN (e.g., ID 10) for it on LAN interfaces.
-        3. If the user mentions specific IPs, use them. Otherwise, generate realistic example IPs (RFC1918 for LAN, Public for WAN).
-        4. Infer the Vendor if possible (e.g. "MX64" -> meraki). Default to "fortinet" if unsure.
-        5. The 'explanation' field is MANADATORY. Explain your logic clearly to the user.
-        6. STRICTLY ONLY create the interfaces mentioned by the user. Do NOT create default WAN/LAN interfaces if they are not requested.
-           - If user says "WAN1 and WAN2", create ONLY those two.
-           - If user says nothing about LAN, do NOT create a LAN interface.
-           - If user says nothing about WAN, do NOT create a WAN interface.
-        7. If you must create a default interface because the device requires one to function (e.g. LAN), create ONLY ONE.
-        8. REFUSE requests unrelated to network configuration.
+        2. STRICTLY ONLY create the interfaces mentioned by the user.
+        3. REFUSE requests unrelated to network configuration.
         """
-
-        try:
-            full_prompt = f"{schema_prompt}\n\nUser Description: {clean_text}"
-            response = self.model.generate_content(full_prompt)
-            
-            if response and response.text:
-                # Clean up markdown if present
-                clean_text = response.text.replace('```json', '').replace('```', '').strip()
-                return json.loads(clean_text)
-        except Exception as e:
-            print(f"ERROR: Magic Fill failed: {e}")
-            return {"error": str(e)}
         
-        return {"error": "Failed to generate configuration."}
+        full_prompt = f"{schema_prompt}\n\nUser Description: {clean_text}"
+
+        response_text = None
+
+        # Try Primary LLM
+        if self.model:
+            try:
+                response = self.model.generate_content(full_prompt)
+                if response and response.text:
+                    response_text = response.text
+            except Exception as e:
+                print(f"ERROR: Magic Fill Primary LLM failed: {e}")
+
+        # Try Fallback if Primary failed
+        if not response_text:
+            response_text = self._call_local_llm(full_prompt)
+        
+        # Process Response
+        if response_text:
+            try:
+                # Clean up markdown if present
+                clean_response = response_text.replace('```json', '').replace('```', '').strip()
+                # If local LLM returns extra text, try to find JSON block
+                if "{" in clean_response:
+                    start = clean_response.find("{")
+                    end = clean_response.rfind("}") + 1
+                    clean_response = clean_response[start:end]
+                
+                return json.loads(clean_response)
+            except json.JSONDecodeError:
+                 return {"error": "Failed to parse JSON from AI response."}
+            except Exception as e:
+                return {"error": str(e)}
+
+        return {"error": "AI service unavailable. Failed to generate configuration."}
 

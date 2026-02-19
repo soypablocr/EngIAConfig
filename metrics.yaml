@@ -1,0 +1,47 @@
+# EngIAConfig AI Metrics
+
+# Performance
+accuracy:
+  description: "Percentage of successfully generated configurations (valid JSON)"
+  target: "> 95%"
+  current: "N/A"
+  frequency: "Daily"
+
+latency:
+  description: "Average time to generate a response"
+  target: "< 2.0 seconds (Chat), < 10.0 seconds (Config Gen)"
+  current: "N/A"
+  frequency: "Real-time"
+
+fallback_rate:
+  description: "Percentage of requests handled by local fallback model"
+  target: "< 5%"
+  current: "N/A"
+  frequency: "Daily"
+
+# Quality & Safety
+bias_score:
+  description: "Frequency of detected biased or harmful terms in outputs"
+  target: "0%"
+  current: "N/A"
+  frequency: "Weekly Review"
+
+hallucination_rate:
+  description: "Percentage of responses containing factually incorrect technical information"
+  target: "< 1%"
+  current: "N/A"
+  frequency: "Weekly Review"
+
+# User Satisfaction
+user_satisfaction_score:
+  description: "Average rating from user feedback (1-5 stars)"
+  target: "> 4.5"
+  current: "N/A"
+  frequency: "Monthly"
+
+# Utility
+conversion_rate:
+  description: "Percentage of chat sessions that result in a downloaded configuration"
+  target: "> 30%"
+  current: "N/A"
+  frequency: "Monthly"

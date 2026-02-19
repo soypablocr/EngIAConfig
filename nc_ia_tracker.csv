@@ -1,0 +1,2 @@
+ID,Date,Description,Source,Severity,Owner,Status,Root Cause,Corrective Action,Verification Date
+NC-001,2024-03-01,Example: Model hallucinated a non-existent Fortinet command.,User Feedback,Medium,DevTeam,Closed,Training data gap,Added specific command to system prompt examples.,2024-03-05
