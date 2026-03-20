@@ -23,7 +23,7 @@ def test_magic_fill():
         
         # 1. Login
         login_response = session.post("http://localhost:5005/login", 
-                                    data={"username": "admin", "password": "admin"},
+                                    data={"username": "admin", "password": "ChangeMeNow!"},
                                     allow_redirects=False)
         
         if login_response.status_code not in [200, 302]:
